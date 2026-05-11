@@ -1,16 +1,16 @@
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
-import ProtectedRoute from './components/ProtectedRoute.jsx';
-import Home from './pages/Home.jsx';
-import SignIn from './pages/SignIn.jsx';
-import SignUp from './pages/SignUp.jsx';
-import Dashboard from './pages/Dashboard.jsx';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import Home from './pages/Home';
+import SignIn from './pages/SignIn';
+import SignUp from './pages/SignUp';
+import Dashboard from './pages/Dashboard';
 import './App.css';
 
 const queryClient = new QueryClient();
 
-function AppContent() {
+function AppContent(): JSX.Element {
 	const { isAuthenticated, logout } = useAuth();
 
 	return (
@@ -56,7 +56,7 @@ function AppContent() {
 	);
 }
 
-function App() {
+function App(): JSX.Element {
 	return (
 		<QueryClientProvider client={queryClient}>
 			<AuthProvider>
