@@ -43,6 +43,79 @@ function verifyToken(req, res, next) {
 	}
 }
 
+function parseTokenPayload(token) {
+	if (!token) return null;
+	try {
+		return jwt.verify(token, process.env.JWT_SECRET || 'secret');
+	} catch {
+		return null;
+	}
+}
+
+const notificationClients = new Map();
+
+function normalizeId(value) {
+	if (!value) return null;
+	if (typeof value === 'string') return value;
+	if (value._id) return String(value._id);
+	if (value.id) return String(value.id);
+	return String(value);
+}
+
+function registerClient(userId, res) {
+	const key = normalizeId(userId);
+	if (!key) return;
+	if (!notificationClients.has(key)) {
+		notificationClients.set(key, new Set());
+	}
+	notificationClients.get(key).add(res);
+}
+
+function unregisterClient(userId, res) {
+	const key = normalizeId(userId);
+	if (!key || !notificationClients.has(key)) return;
+	const clients = notificationClients.get(key);
+	clients.delete(res);
+	if (clients.size === 0) {
+		notificationClients.delete(key);
+	}
+}
+
+function notifyUsers(userIds, payload) {
+	const serializedPayload = `data: ${JSON.stringify(payload)}\n\n`;
+	for (const userId of userIds) {
+		const key = normalizeId(userId);
+		if (!key) continue;
+		const clients = notificationClients.get(key);
+		if (!clients) continue;
+		for (const client of clients) {
+			client.write(serializedPayload);
+		}
+	}
+}
+
+function buildBookingAudience(booking) {
+	const audience = new Set();
+	audience.add(normalizeId(booking.user));
+	for (const attendee of booking.attendeeUsers || []) {
+		audience.add(normalizeId(attendee));
+	}
+	audience.delete(null);
+	return audience;
+}
+
+function emitBookingEvent(booking, eventType, extra = {}) {
+	const audience = buildBookingAudience(booking);
+	const payload = {
+		eventType,
+		bookingId: normalizeId(booking._id),
+		status: booking.status,
+		timestamp: new Date().toISOString(),
+		...extra,
+	};
+	notifyUsers(audience, payload);
+}
+
 // Connect to MongoDB
 mongoose
 	.connect(process.env.MONGODB_URI)
@@ -75,6 +148,36 @@ app.use(express.json({ limit: '8mb' }));
 app.get('/api/health', (req, res) => {
 	res.json({ status: 'ok', timestamp: new Date() });
 });
+
+app.get('/api/notifications/stream', (req, res) => {
+	const token = typeof req.query.token === 'string' ? req.query.token : null;
+	const payload = parseTokenPayload(token);
+	if (!payload?.id) {
+		return res.status(401).json({ error: 'Invalid or expired token.' });
+	}
+
+	res.setHeader('Content-Type', 'text/event-stream');
+	res.setHeader('Cache-Control', 'no-cache, no-transform');
+	res.setHeader('Connection', 'keep-alive');
+	res.flushHeaders?.();
+
+	const userId = normalizeId(payload.id);
+	registerClient(userId, res);
+
+	res.write(`data: ${JSON.stringify({ eventType: 'connected', timestamp: new Date().toISOString(), userId })}\n\n`);
+
+	const heartbeat = setInterval(() => {
+		res.write(': keep-alive\n\n');
+	}, 25000);
+
+	req.on('close', () => {
+		clearInterval(heartbeat);
+		unregisterClient(userId, res);
+	});
+});
+
+// AI routes
+app.use('/api/ai', require('./routes/ai-new'));
 
 // Auth routes
 app.post(
@@ -262,12 +365,19 @@ app.get(
 	'/api/bookings',
 	verifyToken,
 	asyncHandler(async (req, res) => {
-		const { userId, roomId, status } = req.query;
+		const { userId, roomId, status, mine } = req.query;
 		const filter = {};
-		if (userId) {
-			filter.user = userId;
-		} else if (req.user.role !== 'admin') {
-			filter.user = req.user.id;
+		if (String(mine) === 'true') {
+			const targetUserId = String(req.user.id);
+			filter.$or = [{ user: targetUserId }, { attendeeUsers: targetUserId }];
+		} else if (req.user.role === 'admin') {
+			if (userId) filter.user = userId;
+		} else {
+			if (userId && String(userId) !== String(req.user.id)) {
+				return res.status(403).json({ error: 'You can only query your own bookings.' });
+			}
+			const targetUserId = userId ? String(userId) : String(req.user.id);
+			filter.$or = [{ user: targetUserId }, { attendeeUsers: targetUserId }];
 		}
 		if (roomId) filter.room = roomId;
 		if (status) filter.status = status;
@@ -328,6 +438,10 @@ app.post(
 			.populate('attendeeUsers', 'name email avatarUrl')
 			.populate('room', 'name wing roomNumber capacity');
 
+		emitBookingEvent(populatedBooking, 'booking_created', {
+			actorId: normalizeId(req.user.id),
+		});
+
 		res.status(201).json(populatedBooking);
 	}),
 );
@@ -336,12 +450,73 @@ app.put(
 	'/api/bookings/:id',
 	verifyToken,
 	asyncHandler(async (req, res) => {
-		const booking = await Booking.findByIdAndUpdate(req.params.id, req.body, { new: true })
+		const existingBooking = await Booking.findById(req.params.id);
+		if (!existingBooking) return res.status(404).json({ error: 'Booking not found.' });
+
+		const isOwner = String(existingBooking.user) === String(req.user.id);
+		if (req.user.role !== 'admin' && !isOwner) {
+			return res.status(403).json({ error: 'You are not allowed to update this booking.' });
+		}
+
+		const previousAudience = buildBookingAudience(existingBooking);
+		Object.assign(existingBooking, req.body);
+		const booking = await existingBooking.save();
+		const populatedBooking = await Booking.findById(booking._id)
 			.populate('user', 'name email avatarUrl')
 			.populate('attendeeUsers', 'name email avatarUrl')
 			.populate('room', 'name wing roomNumber capacity');
+
+		const currentAudience = buildBookingAudience(populatedBooking);
+		const mergedAudience = new Set([...previousAudience, ...currentAudience]);
+		const eventType = populatedBooking.status === 'cancelled' ? 'booking_cancelled' : 'booking_updated';
+		notifyUsers(mergedAudience, {
+			eventType,
+			bookingId: normalizeId(populatedBooking._id),
+			status: populatedBooking.status,
+			timestamp: new Date().toISOString(),
+			actorId: normalizeId(req.user.id),
+		});
+
+		res.json(populatedBooking);
+	}),
+);
+
+app.put(
+	'/api/bookings/:id/respond',
+	verifyToken,
+	asyncHandler(async (req, res) => {
+		const action = String(req.body.action || '').toLowerCase();
+		if (!['approve', 'decline'].includes(action)) {
+			return res.status(400).json({ error: 'Action must be either approve or decline.' });
+		}
+
+		const booking = await Booking.findById(req.params.id);
 		if (!booking) return res.status(404).json({ error: 'Booking not found.' });
-		res.json(booking);
+
+		const attendeeIds = (booking.attendeeUsers || []).map(id => String(id));
+		const isAttendee = attendeeIds.includes(String(req.user.id));
+		if (req.user.role !== 'admin' && !isAttendee) {
+			return res.status(403).json({ error: 'Only invited attendees can respond to this booking.' });
+		}
+
+		if (booking.status !== 'pending') {
+			return res.status(400).json({ error: 'Only pending bookings can be responded to.' });
+		}
+
+		booking.status = action === 'approve' ? 'confirmed' : 'cancelled';
+		await booking.save();
+
+		const populatedBooking = await Booking.findById(booking._id)
+			.populate('user', 'name email avatarUrl')
+			.populate('attendeeUsers', 'name email avatarUrl')
+			.populate('room', 'name wing roomNumber capacity');
+
+		emitBookingEvent(populatedBooking, 'booking_responded', {
+			action,
+			actorId: normalizeId(req.user.id),
+		});
+
+		res.json(populatedBooking);
 	}),
 );
 

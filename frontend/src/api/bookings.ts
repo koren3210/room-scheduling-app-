@@ -1,5 +1,14 @@
 import api from './client';
 
+export interface BookingNotificationEvent {
+	eventType: string;
+	bookingId?: string;
+	status?: string;
+	timestamp?: string;
+	action?: 'approve' | 'decline';
+	actorId?: string;
+}
+
 export interface BookingPayload {
 	room: string;
 	wing: 'Wing A' | 'Wing B' | 'Wing C' | 'Wing D';
@@ -43,12 +52,13 @@ export interface Booking {
 	notes?: string;
 }
 
-export async function fetchBookings(filter?: { userId?: string; roomId?: string; status?: string }) {
+export async function fetchBookings(filter?: { userId?: string; roomId?: string; status?: string; mine?: boolean }) {
 	const params: Record<string, string> = {};
 
 	if (filter?.userId) params.userId = filter.userId;
 	if (filter?.roomId) params.roomId = filter.roomId;
 	if (filter?.status) params.status = filter.status;
+	if (filter?.mine) params.mine = 'true';
 
 	const response = await api.get<Booking[]>('/api/bookings', { params });
 	return response.data;
@@ -62,4 +72,38 @@ export async function createBooking(payload: BookingPayload) {
 export async function updateBooking(id: string, payload: Partial<BookingPayload>) {
 	const response = await api.put<Booking>(`/api/bookings/${id}`, payload);
 	return response.data;
+}
+
+export async function cancelBooking(id: string) {
+	const response = await api.put<Booking>(`/api/bookings/${id}`, { status: 'cancelled' });
+	return response.data;
+}
+
+export async function respondToBooking(id: string, action: 'approve' | 'decline') {
+	const response = await api.put<Booking>(`/api/bookings/${id}/respond`, { action });
+	return response.data;
+}
+
+export function subscribeToBookingNotifications(
+	token: string,
+	onEvent: (event: BookingNotificationEvent) => void,
+	onError?: () => void,
+) {
+	const baseURL = String(api.defaults.baseURL || '').replace(/\/$/, '');
+	const source = new EventSource(`${baseURL}/api/notifications/stream?token=${encodeURIComponent(token)}`);
+
+	source.onmessage = rawEvent => {
+		try {
+			const parsed = JSON.parse(rawEvent.data);
+			onEvent(parsed);
+		} catch {
+			// Ignore malformed notification events.
+		}
+	};
+
+	source.onerror = () => {
+		onError?.();
+	};
+
+	return source;
 }

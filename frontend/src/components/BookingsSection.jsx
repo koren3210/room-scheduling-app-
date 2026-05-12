@@ -12,21 +12,53 @@ function formatBooking(booking) {
 
 	return {
 		id: booking._id || booking.id,
+		status: booking.status,
+		startAt: booking.startAt,
+		endAt: booking.endAt,
+		ownerId: typeof booking.user === 'object' ? booking.user?._id || booking.user?.id || null : booking.user || null,
+		attendeeUserIds: attendeeUsers
+			.map(attendee => attendee?._id || attendee?.id || attendee)
+			.filter(Boolean)
+			.map(id => String(id)),
 		time: clock,
 		period: period || '',
 		title: booking.purpose || room?.name || 'Meeting',
 		wing: room?.wing || booking.wing,
+		roomName: room?.name || 'Room',
+		owner: owner || null,
 		attendees: booking.attendees || Math.max(attendeeUsers.length, 1),
 		date: start.toLocaleDateString(),
 		avatars: attendeeUsers.length > 0 ? attendeeUsers : owner ? [owner] : [],
 	};
 }
 
-export default function BookingsSection({ bookings }) {
+export default function BookingsSection({
+	bookings,
+	onCancelBooking,
+	onAIDraft,
+	onRespondToBooking,
+	cancelPendingId,
+	respondPending,
+	currentUserId,
+	currentUserRole,
+}) {
 	return (
 		<div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
 			{bookings.map(item => {
 				const booking = formatBooking(item);
+				const isOwner = String(booking.ownerId || '') === String(currentUserId || '');
+				const isAttendee = booking.attendeeUserIds.includes(String(currentUserId || ''));
+				const isAdmin = currentUserRole === 'admin';
+				const canRespond = booking.status === 'pending' && isAttendee && !isOwner;
+				const canCancel = isAdmin || isOwner;
+				const isCancelled = booking.status === 'cancelled';
+				const hasStarted = booking.startAt ? new Date(booking.startAt) <= new Date() : false;
+				const disableCancel = !canCancel || isCancelled || hasStarted;
+				const approvePending =
+					respondPending?.id === booking.id && respondPending?.action === 'approve' && respondPending?.isPending;
+				const declinePending =
+					respondPending?.id === booking.id && respondPending?.action === 'decline' && respondPending?.isPending;
+				const disableRespondButtons = !canRespond || booking.status !== 'pending' || approvePending || declinePending;
 				return (
 					<div
 						key={booking.id}
@@ -42,6 +74,7 @@ export default function BookingsSection({ bookings }) {
 						<div className='flex-1 min-w-0'>
 							<p className='font-bold text-[15px] text-slate-900 dark:text-white truncate'>{booking.title}</p>
 							<div className='flex items-center gap-3 mt-1'>
+								<span className='flex items-center gap-1 text-[10px] text-slate-400 font-medium'>{booking.roomName}</span>
 								<span className='flex items-center gap-1 text-[10px] text-slate-400 font-medium'>
 									<MapPin className='w-3 h-3' />
 									{booking.wing}
@@ -70,12 +103,53 @@ export default function BookingsSection({ bookings }) {
 							<span className='mt-1.5 inline-block text-[9px] font-black uppercase tracking-widest text-slate-300 dark:text-slate-600'>
 								{booking.date}
 							</span>
+							{booking.status && (
+								<span className='ml-2 mt-1.5 inline-block text-[9px] font-black uppercase tracking-widest text-slate-400'>
+									{booking.status}
+								</span>
+							)}
 						</div>
 
 						{/* Action */}
-						<button className='shrink-0 p-2.5 rounded-xl bg-siemens-petrol/[0.08] text-siemens-petrol hover:bg-siemens-petrol hover:text-white transition-all'>
-							<Sparkles className='w-4 h-4' />
-						</button>
+						<div className='shrink-0 flex items-center gap-2'>
+							<button
+								type='button'
+								onClick={() => onAIDraft?.(item)}
+								className='p-2.5 rounded-xl bg-siemens-petrol/[0.08] text-siemens-petrol hover:bg-siemens-petrol hover:text-white transition-all'
+								title='Generate Outlook message'
+							>
+								<Sparkles className='w-4 h-4' />
+							</button>
+							{canRespond ? (
+								<>
+									<button
+										type='button'
+										disabled={disableRespondButtons}
+										onClick={() => onRespondToBooking?.(booking.id, 'approve')}
+										className='px-3 py-2 rounded-xl border border-emerald-200 text-emerald-700 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-50 transition-colors'
+									>
+										{approvePending ? 'Approving' : 'Approve'}
+									</button>
+									<button
+										type='button'
+										disabled={disableRespondButtons}
+										onClick={() => onRespondToBooking?.(booking.id, 'decline')}
+										className='px-3 py-2 rounded-xl border border-amber-200 text-amber-700 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-50 transition-colors'
+									>
+										{declinePending ? 'Declining' : 'Decline'}
+									</button>
+								</>
+							) : (
+								<button
+									type='button'
+									disabled={disableCancel || cancelPendingId === booking.id}
+									onClick={() => onCancelBooking?.(booking.id)}
+									className='px-3 py-2 rounded-xl border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed hover:bg-rose-50 transition-colors'
+								>
+									{isCancelled ? 'Cancelled' : cancelPendingId === booking.id ? 'Cancelling' : 'Cancel'}
+								</button>
+							)}
+						</div>
 					</div>
 				);
 			})}

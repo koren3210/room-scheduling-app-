@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, Send, X } from 'lucide-react';
 
-function AssistantRoomCard({ message, onBookRoom, onUseRoom }) {
+function AssistantRoomCard({ message, onBookRoom }) {
 	const room = message.room;
 	const aiPrefill = message.aiPrefill || {};
 	if (!room) return null;
@@ -28,17 +28,10 @@ function AssistantRoomCard({ message, onBookRoom, onUseRoom }) {
 				<div className='flex items-center gap-2 mt-3'>
 					<button
 						type='button'
-						onClick={() => onBookRoom?.(room)}
+						onClick={() => onBookRoom?.(room, aiPrefill)}
 						className='px-3 py-1.5 bg-siemens-petrol text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-siemens-glow transition-colors'
 					>
 						Book Now
-					</button>
-					<button
-						type='button'
-						onClick={() => onUseRoom?.(room, aiPrefill)}
-						className='px-3 py-1.5 border border-siemens-petrol/30 text-siemens-petrol rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-siemens-petrol/10 transition-colors'
-					>
-						Use In Form
 					</button>
 				</div>
 			</div>
@@ -46,34 +39,55 @@ function AssistantRoomCard({ message, onBookRoom, onUseRoom }) {
 	);
 }
 
-function MessageBubble({ message, onBookRoom, onUseRoom }) {
+function MessageBubble({ message, onBookRoom }) {
 	if (message.type === 'roomSuggestion' && message.role === 'assistant') {
 		return (
 			<>
-				<p>{message.text}</p>
-				<AssistantRoomCard message={message} onBookRoom={onBookRoom} onUseRoom={onUseRoom} />
+				<p>
+					{message.text}
+					{message.streaming && (
+						<span className='inline-block w-2 h-4 ml-1 align-middle bg-siemens-petrol/70 animate-pulse' />
+					)}
+				</p>
+				{!message.streaming && <AssistantRoomCard message={message} onBookRoom={onBookRoom} />}
 			</>
 		);
 	}
 
-	return <p>{message.text}</p>;
+	return (
+		<p>
+			{message.text}
+			{message.streaming && <span className='inline-block w-2 h-4 ml-1 align-middle bg-siemens-petrol/70 animate-pulse' />}
+		</p>
+	);
+}
+
+function ThinkingDots() {
+	return (
+		<div className='flex items-center gap-1.5'>
+			<span className='h-2 w-2 rounded-full bg-siemens-petrol/80 animate-bounce [animation-delay:-0.2s]' />
+			<span className='h-2 w-2 rounded-full bg-siemens-petrol/80 animate-bounce [animation-delay:-0.1s]' />
+			<span className='h-2 w-2 rounded-full bg-siemens-petrol/80 animate-bounce' />
+			<span className='text-[11px] font-semibold text-slate-500 dark:text-slate-300 ml-1'>AI is thinking</span>
+		</div>
+	);
 }
 
 export default function AIChatPanel({
 	messages,
+	isThinking,
 	onSendMessage,
 	onOpenMobileChat,
 	mobileOpen,
 	onCloseMobileChat,
 	onBookRoom,
-	onUseRoom,
 	userAvatarUrl,
 }) {
 	const [input, setInput] = useState('');
 
 	const handleSubmit = event => {
 		event.preventDefault();
-		if (!input.trim()) return;
+		if (!input.trim() || isThinking) return;
 		onSendMessage(input.trim());
 		setInput('');
 	};
@@ -125,7 +139,7 @@ export default function AIChatPanel({
 							<div
 								className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${message.role === 'user' ? 'rounded-br-sm bg-siemens-petrol text-white' : 'rounded-bl-sm bg-white dark:bg-slate-900 border border-black/5 dark:border-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'}`}
 							>
-								<MessageBubble message={message} onBookRoom={onBookRoom} onUseRoom={onUseRoom} />
+								<MessageBubble message={message} onBookRoom={onBookRoom} />
 							</div>
 							{message.role === 'user' && (
 								<div className='w-8 h-8 rounded-full bg-brand-500/10 shrink-0 shadow-sm ml-3 border border-white/20 flex items-center justify-center overflow-hidden'>
@@ -138,6 +152,16 @@ export default function AIChatPanel({
 							)}
 						</div>
 					))}
+					{isThinking && (
+						<div className='flex items-end max-w-[85%] justify-start animate-fade-in'>
+							<div className='w-8 h-8 rounded-full bg-slate-200 dark:bg-gray-800 flex items-center justify-center shrink-0 shadow-sm mr-3 border border-black/5 dark:border-white/5'>
+								<Bot className='w-4 h-4 text-siemens-petrol' />
+							</div>
+							<div className='px-4 py-3 rounded-2xl rounded-bl-sm bg-white dark:bg-slate-900 border border-black/5 dark:border-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'>
+								<ThinkingDots />
+							</div>
+						</div>
+					)}
 				</div>
 
 				<div className='p-5 border-t border-black/5 dark:border-white/5 bg-white/50 dark:bg-gray-900/50 backdrop-blur-md shrink-0'>
@@ -148,6 +172,7 @@ export default function AIChatPanel({
 									key={prompt}
 									type='button'
 									onClick={() => onSendMessage(prompt)}
+									disabled={isThinking}
 									className='shrink-0 px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-black/5 dark:border-white/5 text-[11px] font-medium shadow-sm active:scale-95 whitespace-nowrap text-slate-600 dark:text-gray-300 hover:text-siemens-petrol transition-colors'
 								>
 									{prompt}
@@ -159,12 +184,14 @@ export default function AIChatPanel({
 						<input
 							value={input}
 							onChange={event => setInput(event.target.value)}
+							disabled={isThinking}
 							type='text'
 							className='chat-input w-full bg-white dark:bg-[#0f151a] border border-black/5 dark:border-white/5 rounded-xl pl-4 pr-12 py-3.5 focus:outline-none focus:border-siemens-petrol focus:ring-1 focus:ring-siemens-petrol shadow-sm text-sm text-slate-900 dark:text-white transition-all'
 							placeholder='Ask for a room...'
 						/>
 						<button
 							type='submit'
+							disabled={isThinking}
 							className='absolute right-1.5 top-1.5 w-9 h-9 bg-siemens-petrol text-white rounded-lg flex items-center justify-center transition-all hover:bg-siemens-glow active:scale-95'
 						>
 							<Send className='w-4 h-4' />
@@ -212,7 +239,7 @@ export default function AIChatPanel({
 									<div
 										className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${message.role === 'user' ? 'rounded-br-sm bg-siemens-petrol text-white' : 'rounded-bl-sm bg-white dark:bg-[#1A2227] border border-black/5 dark:border-white/5 text-slate-800 dark:text-gray-200 shadow-sm'}`}
 									>
-										<MessageBubble message={message} onBookRoom={onBookRoom} onUseRoom={onUseRoom} />
+										<MessageBubble message={message} onBookRoom={onBookRoom} />
 									</div>
 									{message.role === 'user' && (
 										<div className='w-8 h-8 rounded-full bg-brand-500/10 shrink-0 shadow-sm ml-3 border border-white/20 flex items-center justify-center overflow-hidden'>
@@ -225,6 +252,16 @@ export default function AIChatPanel({
 									)}
 								</div>
 							))}
+							{isThinking && (
+								<div className='flex items-end max-w-[90%] justify-start animate-fade-in'>
+									<div className='w-8 h-8 rounded-full bg-slate-200 dark:bg-gray-800 flex items-center justify-center shrink-0 shadow-sm mr-3 border border-black/5 dark:border-white/5'>
+										<Bot className='w-4 h-4 text-siemens-petrol' />
+									</div>
+									<div className='px-4 py-3 rounded-2xl rounded-bl-sm bg-white dark:bg-[#1A2227] border border-black/5 dark:border-white/5 text-slate-800 dark:text-gray-200 shadow-sm'>
+										<ThinkingDots />
+									</div>
+								</div>
+							)}
 						</div>
 
 						<div className='p-3 border-t border-black/5 dark:border-white/5 bg-white/90 dark:bg-[#0B1114]/90 backdrop-blur-xl'>
@@ -232,12 +269,14 @@ export default function AIChatPanel({
 								<input
 									value={input}
 									onChange={event => setInput(event.target.value)}
+									disabled={isThinking}
 									type='text'
 									className='w-full bg-white dark:bg-slate-900 border border-black/5 dark:border-slate-700 rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:border-siemens-petrol focus:ring-1 focus:ring-siemens-petrol text-sm text-slate-900 dark:text-white'
 									placeholder='Ask for a room...'
 								/>
 								<button
 									type='submit'
+									disabled={isThinking}
 									className='absolute right-1.5 top-1.5 w-9 h-9 bg-siemens-petrol text-white rounded-lg flex items-center justify-center active:scale-95'
 								>
 									<Send className='w-4 h-4' />

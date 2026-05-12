@@ -10,6 +10,7 @@ import RecommendationSection from '../components/RecommendationSection.jsx';
 import { fetchRooms } from '../api/rooms';
 import { createBooking } from '../api/bookings';
 import { fetchUsers } from '../api/users';
+import { parseBookingAI } from '../api/ai';
 import { useAuth } from '../contexts/AuthContext';
 
 function nextHalfHourWindow() {
@@ -19,6 +20,18 @@ function nextHalfHourWindow() {
 	start.setMinutes(minutes < 30 ? 30 : 60, 0, 0);
 	const end = new Date(start.getTime() + 60 * 60 * 1000);
 	return { start, end };
+}
+
+function parseAIDate(value) {
+	if (!value) return null;
+	if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+	if (typeof value !== 'string') return null;
+
+	// Handle local datetime string formats like "2026-05-13 11:00" reliably.
+	const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+	const date = new Date(normalized);
+	if (Number.isNaN(date.getTime())) return null;
+	return date;
 }
 
 export default function BookingPage() {
@@ -33,6 +46,7 @@ export default function BookingPage() {
 			text: `Hello ${firstName}. I'm connected to the APC site sensors. Wings A-D are active. Ask me to find a room, check amenities, or draft invites.`,
 		},
 	]);
+	const [aiPending, setAiPending] = useState(false);
 	const [mobileChatOpen, setMobileChatOpen] = useState(false);
 	const [bookingModalOpen, setBookingModalOpen] = useState(false);
 	const initialWindow = useMemo(() => nextHalfHourWindow(), []);
@@ -77,101 +91,96 @@ export default function BookingPage() {
 		},
 	});
 
-	const pickSuggestedRoom = content => {
-		const rooms = roomsQuery.data || [];
-		if (rooms.length === 0) return null;
-
-		const wingMatch = content.match(/wing\s*([abcd])/i);
-		const capacityMatch = content.match(/(\d+)\s*(people|person|seats?)/i);
-		const requestedWing = wingMatch ? `Wing ${wingMatch[1].toUpperCase()}` : null;
-		const requestedCapacity = capacityMatch ? Number(capacityMatch[1]) : null;
-
-		// Parse for amenities (simple: look for 'whiteboard', 'projector', etc)
-		const amenityKeywords = ['whiteboard', 'projector', 'tv', 'screen', 'video', 'conference', 'phone', 'monitor'];
-		const requestedAmenities = amenityKeywords.filter(a => content.toLowerCase().includes(a));
-
-		let filtered = rooms;
-		if (requestedWing) filtered = filtered.filter(room => room.wing === requestedWing);
-		if (requestedCapacity) filtered = filtered.filter(room => room.capacity >= requestedCapacity);
-		if (requestedAmenities.length > 0) {
-			filtered = filtered.filter(room =>
-				requestedAmenities.every(a => (room.amenities || []).map(x => x.toLowerCase()).includes(a)),
-			);
-		}
-
-		return (filtered[0] || rooms[0]) ?? null;
-	};
-
-	// Helper to extract meeting name and attendees from input
-	function parseMeetingDetails(content, users) {
-		// Try to extract a quoted meeting name or after 'called|named|for|about'
-		let purpose = '';
-		const nameMatch = content.match(/(?:called|named|for|about)\s+['"]?([\w\s-]{3,})['"]?/i);
-		if (nameMatch) {
-			purpose = nameMatch[1].trim();
-		} else {
-			// fallback: look for quoted string
-			const quoteMatch = content.match(/['"]([\w\s-]{3,})['"]/);
-			if (quoteMatch) purpose = quoteMatch[1].trim();
-		}
-
-		// Try to extract attendees by name or email
-		let attendees = [];
-		if (users && users.length) {
-			// Find all names/emails in the content
-			users.forEach(u => {
-				if (
-					(u.name && new RegExp(u.name, 'i').test(content)) ||
-					(u.email && content.toLowerCase().includes(u.email.toLowerCase()))
-				) {
-					attendees.push(u.id);
-				}
-			});
-		}
-		return { purpose, attendees };
-	}
-
-	const handleSendMessage = content => {
+	const handleSendMessage = async content => {
+		if (aiPending) return;
 		const userMsg = { id: `u-${Date.now()}`, role: 'user', text: content };
 		setMessages(curr => [...curr, userMsg]);
-		setTimeout(() => {
-			const suggestedRoom = pickSuggestedRoom(content);
-			const users = usersQuery.data || [];
-			const { purpose, attendees } = parseMeetingDetails(content, users);
-			if (suggestedRoom) {
+		setAiPending(true);
+
+		const streamAssistantMessage = payload =>
+			new Promise(resolve => {
+				const id = payload.id || `a-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+				const fullText = payload.text || '';
+				setMessages(curr => [...curr, { ...payload, id, text: '', streaming: true }]);
+
+				if (!fullText.length) {
+					setMessages(curr => curr.map(msg => (msg.id === id ? { ...msg, streaming: false } : msg)));
+					resolve();
+					return;
+				}
+
+				let index = 0;
+				const chunk = Math.max(1, Math.ceil(fullText.length / 42));
+				const timer = setInterval(() => {
+					index = Math.min(fullText.length, index + chunk);
+					const done = index >= fullText.length;
+					setMessages(curr =>
+						curr.map(msg =>
+							msg.id === id
+								? {
+										...msg,
+										text: fullText.slice(0, index),
+										streaming: !done,
+									}
+								: msg,
+						),
+					);
+					if (done) {
+						clearInterval(timer);
+						resolve();
+					}
+				}, 28);
+			});
+
+		// Call backend AI endpoint
+		try {
+			const aiResult = await parseBookingAI(content);
+			if (aiResult && aiResult.roomId) {
+				// Find the room object
+				const rooms = roomsQuery.data || [];
+				const room = rooms.find(r => (r._id || r.id) === aiResult.roomId);
+				const attendeeIds = Array.isArray(aiResult.attendees) ? aiResult.attendees : [];
 				const aiCard = {
-					id: `a-${Date.now()}`,
 					role: 'assistant',
 					type: 'roomSuggestion',
-					text: `I found a strong match for your request.`,
-					room: {
-						id: suggestedRoom._id || suggestedRoom.id,
-						name: suggestedRoom.name,
-						wing: suggestedRoom.wing,
-						capacity: suggestedRoom.capacity,
-						amenities: suggestedRoom.amenities || [],
-						image:
-							suggestedRoom.images?.[0] ||
-							'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80',
-					},
+					text: aiResult.purpose
+						? `I found a room and filled the form for: ${aiResult.purpose}`
+						: 'I found a strong match for your request.',
+					room: room
+						? {
+								id: room._id || room.id,
+								name: room.name,
+								wing: room.wing,
+								capacity: room.capacity,
+								amenities: room.amenities || [],
+								image:
+									room.images?.[0] ||
+									'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80',
+							}
+						: null,
 					aiPrefill: {
-						purpose,
-						attendees,
+						purpose: aiResult.purpose,
+						attendees: attendeeIds,
+						amenities: aiResult.amenities,
+						startAt: aiResult.startAt,
+						endAt: aiResult.endAt,
 					},
 				};
-				setMessages(curr => [...curr, aiCard]);
-				return;
+				await streamAssistantMessage(aiCard);
+			} else {
+				await streamAssistantMessage({
+					role: 'assistant',
+					text: aiResult?.error || 'Sorry, I could not find a suitable room.',
+				});
 			}
-
-			const aiMsg = {
-				id: `a-${Date.now()}`,
+		} catch (err) {
+			await streamAssistantMessage({
 				role: 'assistant',
-				text: content.toLowerCase().includes('booking')
-					? 'I found the best available room and prepared a reservation suggestion. Want me to send the invite?'
-					: 'I recommend the Beta Lab in Wing B — it matches your capacity and includes video conferencing.',
-			};
-			setMessages(curr => [...curr, aiMsg]);
-		}, 700);
+				text: 'AI error: ' + (err?.message || 'Unknown error'),
+			});
+		} finally {
+			setAiPending(false);
+		}
 	};
 
 	const recommendations = (roomsQuery.data || []).slice(0, 8).map(room => ({
@@ -199,10 +208,18 @@ export default function BookingPage() {
 
 	// Accepts optional aiPrefill for purpose and attendees
 	const handleUseInForm = (selectedRoom, aiPrefill = {}) => {
+		const fallbackWindow = nextHalfHourWindow();
+		const aiStartAt = parseAIDate(aiPrefill.startAt);
+		const aiEndAt = parseAIDate(aiPrefill.endAt);
+		const startAt = aiStartAt || fallbackWindow.start;
+		const endAt = aiEndAt && aiEndAt > startAt ? aiEndAt : new Date(startAt.getTime() + 60 * 60 * 1000);
+
 		setForm(curr => ({
 			...curr,
 			room: selectedRoom.id || selectedRoom._id,
 			wing: selectedRoom.wing,
+			startAt,
+			endAt,
 			purpose: aiPrefill.purpose || `Meeting in ${selectedRoom.name}`,
 		}));
 		// Always include the current user in attendees
@@ -369,12 +386,12 @@ export default function BookingPage() {
 				<div className='flex flex-col gap-6 min-h-0'>
 					<AIChatPanel
 						messages={messages}
+						isThinking={aiPending}
 						onSendMessage={handleSendMessage}
 						onOpenMobileChat={() => setMobileChatOpen(true)}
 						mobileOpen={mobileChatOpen}
 						onCloseMobileChat={() => setMobileChatOpen(false)}
-						onBookRoom={handleQuickBook}
-						onUseRoom={handleUseInForm}
+						onBookRoom={handleUseInForm}
 						userAvatarUrl={user?.avatarUrl}
 					/>
 					<RecommendationSection
