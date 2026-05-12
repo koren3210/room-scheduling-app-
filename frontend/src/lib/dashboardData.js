@@ -69,16 +69,22 @@ export const mockBookings = [
 	{
 		id: 'b1',
 		title: 'Project Delta Sync',
-		time: '09:30 AM',
-		wing: 'Wing B',
+		time: '09',
+		period: 'AM',
+		wing: 'Wing B · Beta Lab',
 		status: 'confirmed',
+		attendees: 6,
+		date: 'Today',
 	},
 	{
 		id: 'b2',
 		title: 'Customer Review',
-		time: '11:00 AM',
-		wing: 'Wing A',
+		time: '11',
+		period: 'AM',
+		wing: 'Wing A · Conference A',
 		status: 'pending',
+		attendees: 4,
+		date: 'Today',
 	},
 ];
 
@@ -94,5 +100,13 @@ export const mockAdminRooms = [
 		name: 'Beta Studio',
 		wing: 'Wing B',
 		amenities: ['Telepresence', 'Smart Board'],
+	},
+];
+
+export const initialMessages = [
+	{
+		id: 'm1',
+		role: 'assistant',
+		text: "Hello there. I'm connected to the APC site sensors. Wings A-D are active. Ask me to find a room, check amenities, or draft invites.",
 	},
 ];

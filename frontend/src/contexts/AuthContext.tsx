@@ -1,8 +1,12 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface User {
+	id: string;
 	name: string;
 	email: string;
+	avatarUrl?: string;
+	role?: string;
+	preferences?: Record<string, unknown>;
 }
 
 interface AuthContextType {
@@ -18,28 +22,34 @@ interface AuthProviderProps {
 	children: ReactNode;
 }
 
-export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
-	const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-	const [user, setUser] = useState<User | null>(null);
+export function AuthProvider({ children }: AuthProviderProps) {
+	// Check localStorage IMMEDIATELY during initialization
+	// This prevents the brief flash of the login screen on refresh
+	const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+		return !!localStorage.getItem('token');
+	});
 
-	useEffect(() => {
-		const token = localStorage.getItem('token');
-		if (token) {
-			// Assuming token is valid, set authenticated
-			setIsAuthenticated(true);
-			// You can decode token to get user info if needed
-			setUser({ name: 'Alex M.', email: 'alex@example.com' }); // Placeholder
+	const [user, setUser] = useState<User | null>(() => {
+		const storedUser = localStorage.getItem('user');
+		if (!storedUser) return null;
+		try {
+			return JSON.parse(storedUser) as User;
+		} catch {
+			localStorage.removeItem('user');
+			return null;
 		}
-	}, []);
+	});
 
 	const login = (token: string, userData: User) => {
 		localStorage.setItem('token', token);
+		localStorage.setItem('user', JSON.stringify(userData));
 		setIsAuthenticated(true);
 		setUser(userData);
 	};
 
 	const logout = () => {
 		localStorage.removeItem('token');
+		localStorage.removeItem('user');
 		setIsAuthenticated(false);
 		setUser(null);
 	};

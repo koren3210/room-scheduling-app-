@@ -1,92 +1,192 @@
-import { Cpu, Sparkles, Calendar, Radar, ShieldCheck, Settings } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink } from 'react-router-dom';
+import { Cpu, Sparkles, Calendar, Radar, ShieldCheck, Settings, ChevronLeft, LogOut } from 'lucide-react';
 
 const navItems = [
-	{ id: 'booking', label: 'Booking', icon: Sparkles },
-	{ id: 'my-bookings', label: 'Schedule', icon: Calendar },
-	{ id: 'facility', label: 'Facility', icon: Radar },
-	{ id: 'admin', label: 'Admin', icon: ShieldCheck },
-	{ id: 'settings', label: 'Settings', icon: Settings, mobileOnly: true },
+	{ id: 'booking', label: 'Booking', icon: Sparkles, path: '/dashboard/booking' },
+	{ id: 'my-bookings', label: 'Schedule', icon: Calendar, path: '/dashboard/my-bookings' },
+	{ id: 'facility', label: 'Facility', icon: Radar, path: '/dashboard/facility' },
+	{ id: 'admin', label: 'Admin', icon: ShieldCheck, path: '/dashboard/admin' },
 ];
 
-export default function DashboardSidebar({ active, onChange, collapsed, onToggleCollapse, profile }) {
+const mobileNavItems = [...navItems, { id: 'settings', label: 'Settings', icon: Settings, path: '/dashboard/settings' }];
+
+export default function DashboardSidebar({ collapsed, onToggleCollapse, profile, onLogout }) {
+	const [accountOpen, setAccountOpen] = useState(false);
+	const accountRef = useRef(null);
+
+	useEffect(() => {
+		const handleClickOutside = event => {
+			if (accountRef.current && !accountRef.current.contains(event.target)) {
+				setAccountOpen(false);
+			}
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, []);
+
+	const handleLogout = () => {
+		setAccountOpen(false);
+		onLogout?.();
+	};
+
 	return (
-		<aside
-			id='main-sidebar'
-			className={`fixed bottom-0 left-0 w-full lg:static lg:w-64 lg:h-screen glass border-t lg:border-t-0 lg:border-r border-black/5 dark:border-white/5 flex flex-row lg:flex-col justify-around lg:justify-between items-center lg:items-stretch z-50 shadow-2xl lg:shadow-none shrink-0 pb-6 lg:pb-0 transition-all ${
-				collapsed ? 'lg:w-20' : ''
-			}`}
-		>
-			<div className='hidden lg:block'>
+		<>
+			{/* ── DESKTOP SIDEBAR ── */}
+			<aside
+				className={`
+					hidden lg:flex flex-col flex-shrink-0 h-screen sticky top-0
+					bg-white/80 dark:bg-[#0d1117]/90 backdrop-blur-2xl
+					border-r border-black/[0.06] dark:border-white/[0.06]
+					transition-all duration-300 ease-in-out z-40
+					${collapsed ? 'w-[72px]' : 'w-[280px]'}
+				`}
+			>
+				{/* Logo */}
 				<div
-					id='sidebar-logo-container'
 					onClick={onToggleCollapse}
-					className='h-24 flex items-center px-6 border-b border-black/5 dark:border-white/5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors duration-300'
+					className='h-[72px] flex items-center justify-between px-4 border-b border-black/[0.06] dark:border-white/[0.06] cursor-pointer hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors duration-200 shrink-0'
 				>
-					<div className='w-10 h-10 rounded-xl bg-siemens-petrol flex items-center justify-center shadow-lg'>
-						<Cpu className='text-white w-5 h-5' />
-					</div>
-					<span
-						className={`sidebar-text ml-4 font-bold text-xl text-slate-900 dark:text-white whitespace-nowrap transition-all duration-300 ${
-							collapsed ? 'hidden' : 'block'
-						}`}
-					>
-						Siemens<span className='text-siemens-glow'>Booking</span>
-					</span>
-				</div>
-			</div>
-
-			<nav className='flex flex-row lg:flex-col w-full lg:w-auto justify-around lg:justify-start px-2 lg:px-4 lg:mt-6 space-x-1 lg:space-x-0 lg:space-y-1'>
-				{navItems.map(item => {
-					if (item.mobileOnly) {
-						return (
-							<button
-								key={item.id}
-								onClick={() => onChange(item.id)}
-								className={`nav-item ${active === item.id ? 'is-active' : ''} flex flex-col lg:flex-row items-center lg:justify-start px-4 py-2 lg:py-3.5 rounded-2xl w-full`}
-							>
-								<item.icon className='w-5 h-5 lg:mr-3 shrink-0' />
-								<span className='sidebar-text hidden sm:block text-[10px] lg:text-sm font-semibold whitespace-nowrap'>
-									{item.label}
-								</span>
-							</button>
-						);
-					}
-
-					return (
-						<button
-							key={item.id}
-							onClick={() => onChange(item.id)}
-							className={`nav-item ${active === item.id ? 'is-active' : ''} flex flex-col lg:flex-row items-center lg:justify-start px-4 py-2 lg:py-3.5 rounded-2xl w-full`}
-						>
-							<item.icon className='w-5 h-5 lg:mr-3 shrink-0' />
-							<span className='sidebar-text hidden sm:block text-[10px] lg:text-sm font-semibold whitespace-nowrap'>
-								{item.label}
+					<div className='flex items-center gap-3 min-w-0'>
+						<div className='w-9 h-9 rounded-xl bg-gradient-to-br from-siemens-petrol to-siemens-dark flex items-center justify-center shadow-md shadow-siemens-petrol/20 shrink-0'>
+							<Cpu className='text-white w-4 h-4' />
+						</div>
+						{!collapsed && (
+							<span className='font-bold text-[15px] text-slate-900 dark:text-white whitespace-nowrap truncate'>
+								Siemens<span className='text-siemens-petrol'>Booking</span>
 							</span>
-						</button>
-					);
-				})}
-			</nav>
+						)}
+					</div>
+					{!collapsed && <ChevronLeft className='w-4 h-4 text-slate-400 shrink-0' />}
+				</div>
 
-			<div className='hidden lg:block p-6 border-t border-black/5 dark:border-white/5'>
-				<button
-					onClick={() => onChange('settings')}
-					className='nav-item flex items-center px-4 py-3.5 rounded-xl mb-4 w-full text-left'
-				>
-					<Settings className='w-5 h-5 lg:mr-3 shrink-0' />
-					<span className='sidebar-text font-medium text-sm whitespace-nowrap'>Settings</span>
-				</button>
-				<div id='profile-container' className='flex items-center px-2 transition-all duration-300'>
-					<img
-						src={profile.avatarUrl}
-						alt={profile.name}
-						className='w-10 h-10 rounded-full border border-black/10 shadow-sm shrink-0'
-					/>
-					<div className='profile-details ml-3 transition-all duration-300 overflow-hidden'>
-						<p className='text-sm font-bold truncate text-slate-900 dark:text-white'>{profile.name}</p>
-						<p className='text-[10px] text-slate-500 font-bold tracking-widest uppercase'>{profile.team}</p>
+				{/* Nav */}
+				<nav className='flex-1 px-3 py-4 space-y-0.5 overflow-y-auto'>
+					{!collapsed && (
+						<p className='text-[9px] font-black uppercase tracking-widest text-slate-400/70 dark:text-slate-600 px-2 mb-3'>
+							Navigation
+						</p>
+					)}
+					{navItems.map(item => (
+						<NavLink
+							key={item.id}
+							to={item.path}
+							title={collapsed ? item.label : undefined}
+							className={({ isActive }) =>
+								`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
+									isActive
+										? 'bg-siemens-petrol/10 dark:bg-siemens-petrol/15 text-siemens-petrol'
+										: 'text-slate-500 dark:text-slate-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-white'
+								} ${collapsed ? 'justify-center' : ''}`
+							}
+						>
+							{({ isActive }) => (
+								<>
+									{isActive && (
+										<span className='absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-siemens-petrol rounded-r-full' />
+									)}
+									<item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-siemens-petrol' : ''}`} />
+									{!collapsed && <span className='text-sm font-semibold'>{item.label}</span>}
+								</>
+							)}
+						</NavLink>
+					))}
+				</nav>
+
+				{/* Footer */}
+				<div className='p-3 border-t border-black/[0.06] dark:border-white/[0.06] space-y-1 shrink-0'>
+					<NavLink
+						to='/dashboard/settings'
+						title={collapsed ? 'Settings' : undefined}
+						className={({ isActive }) =>
+							`group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
+								isActive
+									? 'bg-siemens-petrol/10 text-siemens-petrol'
+									: 'text-slate-500 dark:text-slate-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-white'
+							} ${collapsed ? 'justify-center' : ''}`
+						}
+					>
+						<Settings className='w-4 h-4 shrink-0' />
+						{!collapsed && <span className='text-sm font-semibold'>Settings</span>}
+					</NavLink>
+
+					<div className='relative' ref={accountRef}>
+						{!collapsed && (
+							<button
+								type='button'
+								onClick={() => setAccountOpen(prev => !prev)}
+								className='w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors'
+							>
+								<img
+									src={profile.avatarUrl}
+									alt={profile.name}
+									className='w-8 h-8 rounded-full border-2 border-siemens-petrol/20 shrink-0'
+								/>
+								<div className='min-w-0 text-left'>
+									<p className='text-[13px] font-bold text-slate-900 dark:text-white truncate leading-tight'>
+										{profile.name}
+									</p>
+									<p className='text-[9px] text-slate-400 font-bold tracking-widest uppercase'>{profile.team}</p>
+								</div>
+							</button>
+						)}
+
+						{collapsed && (
+							<button
+								type='button'
+								onClick={() => setAccountOpen(prev => !prev)}
+								className='w-full flex justify-center px-3 py-2 rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors'
+							>
+								<img
+									src={profile.avatarUrl}
+									alt={profile.name}
+									className='w-8 h-8 rounded-full border-2 border-siemens-petrol/20'
+								/>
+							</button>
+						)}
+
+						{accountOpen && (
+							<div
+								className={`absolute ${collapsed ? 'left-full ml-2 bottom-0' : 'left-0 right-0 bottom-full mb-2'} bg-white dark:bg-[#0f151a] border border-black/[0.08] dark:border-white/[0.08] rounded-xl p-1.5 shadow-xl z-50`}
+							>
+								<button
+									type='button'
+									onClick={handleLogout}
+									className='w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/10 transition-colors'
+								>
+									<LogOut className='w-3.5 h-3.5' />
+									Logout
+								</button>
+							</div>
+						)}
 					</div>
 				</div>
-			</div>
-		</aside>
+			</aside>
+
+			{/* ── MOBILE BOTTOM BAR ── */}
+			<nav className='lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-[#0d1117]/95 backdrop-blur-xl border-t border-black/[0.06] dark:border-white/[0.06] flex justify-around items-center px-2 py-2 safe-area-bottom'>
+				{mobileNavItems.map(item => (
+					<NavLink
+						key={item.id}
+						to={item.path}
+						className={({ isActive }) =>
+							`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-200 ${
+								isActive ? 'text-siemens-petrol' : 'text-slate-400 dark:text-slate-500'
+							}`
+						}
+					>
+						{({ isActive }) => (
+							<>
+								<div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'bg-siemens-petrol/10' : ''}`}>
+									<item.icon className='w-5 h-5' />
+								</div>
+								<span className='text-[9px] font-bold tracking-wide'>{item.label}</span>
+							</>
+						)}
+					</NavLink>
+				))}
+			</nav>
+		</>
 	);
 }

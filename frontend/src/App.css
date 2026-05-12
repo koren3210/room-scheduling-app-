@@ -64,6 +64,31 @@ body.dark {
 	background: rgba(0, 153, 153, 0.09);
 }
 
+.nav-item {
+	color: var(--text);
+	background: transparent;
+	transition:
+		background 0.2s ease,
+		color 0.2s ease,
+		transform 0.2s ease;
+}
+
+.nav-item:hover {
+	background: rgba(0, 153, 153, 0.08);
+	color: var(--brand);
+}
+
+.nav-item.is-active {
+	background: rgba(0, 153, 153, 0.14);
+	color: var(--text);
+}
+
+.sidebar-text {
+	transition:
+		opacity 0.2s ease,
+		max-width 0.2s ease;
+}
+
 .app-main {
 	width: min(1120px, 100%);
 	margin: 0 auto;

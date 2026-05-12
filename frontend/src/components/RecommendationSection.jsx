@@ -1,51 +1,75 @@
-export default function RecommendationSection({ recommendations }) {
+import { Sparkles, Users } from 'lucide-react';
+
+export default function RecommendationSection({ recommendations, onQuickBook, onSelectRoom, onSeeAll }) {
 	return (
-		<section className='lg:col-span-5 xl:col-span-4 flex flex-col h-full'>
-			<div className='flex items-center justify-between mb-4 lg:mb-5 mt-6 lg:mt-0'>
-				<h2 className='text-lg font-bold flex items-center text-slate-900 dark:text-white'>
-					<span className='inline-flex items-center mr-2 text-amber-500'>
-						<svg viewBox='0 0 24 24' className='w-4 h-4' fill='currentColor'>
-							<path d='M12 2l2.39 4.84 5.34.78-3.86 3.76.91 5.3L12 14.77l-4.78 2.51.91-5.3L4.26 7.62l5.34-.78L12 2z'></path>
-						</svg>
-					</span>
-					Recommendations
-				</h2>
+		<section className='flex flex-col min-h-0'>
+			<div className='flex items-center justify-between gap-2 mb-4 shrink-0'>
+				<div className='flex items-center gap-2'>
+					<Sparkles className='w-4 h-4 text-amber-500' />
+					<h2 className='text-base font-bold text-slate-900 dark:text-white'>Recommendations</h2>
+				</div>
+				<button
+					type='button'
+					onClick={onSeeAll}
+					className='px-3 py-1.5 rounded-lg border border-siemens-petrol/30 text-siemens-petrol text-[10px] font-black uppercase tracking-widest hover:bg-siemens-petrol/10 transition-colors'
+				>
+					See All
+				</button>
 			</div>
-			<div className='flex lg:flex-col space-x-4 lg:space-x-0 lg:space-y-4 overflow-x-auto lg:overflow-y-auto pb-4 custom-scrollbar lg:pr-2 snap-x snap-mandatory'>
-				{recommendations.map(item => (
-					<article
-						key={item.id}
-						className='glass-panel p-2 rounded-3xl min-w-[280px] lg:w-full snap-center border-none shadow-sm shrink-0 transition-transform hover:scale-[1.01]'
+
+			<div className='flex gap-4 overflow-x-auto pb-2 snap-x flex-1 min-h-0'>
+				{recommendations.map(r => (
+					<div
+						key={r.id || r._id}
+						className='flex-shrink-0 w-[280px] lg:w-[320px] snap-center bg-white/80 dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl overflow-hidden hover:scale-[1.01] transition-transform shadow-sm'
 					>
-						<div className='relative h-32 lg:h-36 w-full overflow-hidden rounded-[1.5rem] mb-4 shrink-0'>
-							<img src={item.image} alt={item.name} className='w-full h-full object-cover' />
-							<div className='absolute top-3 right-3 bg-white/90 dark:bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-full flex items-center shadow-lg'>
-								<span className='text-[10px] font-black text-slate-900 dark:text-white'>{item.score}% Match</span>
+						<div className='relative h-28 overflow-hidden'>
+							<img
+								src={
+									r.image || 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80'
+								}
+								alt={r.name}
+								className='w-full h-full object-cover'
+							/>
+							<div className='absolute inset-0 bg-gradient-to-t from-black/40 to-transparent' />
+							<div className='absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 dark:bg-black/80 backdrop-blur px-2 py-1 rounded-full'>
+								<Sparkles className='w-2.5 h-2.5 text-siemens-petrol' />
+								<span className='text-[10px] font-black text-slate-900 dark:text-white'>{r.score}%</span>
 							</div>
 						</div>
-						<div className='px-3 pb-3 flex-1 flex flex-col'>
-							<div className='flex justify-between items-start mb-2'>
-								<h3 className='font-bold text-base text-slate-900 dark:text-white'>{item.name}</h3>
-								<span className='text-[10px] font-black bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-300 px-2 py-1 rounded-lg shrink-0'>
-									{item.capacity}
+						<div className='p-4'>
+							<div className='flex items-center justify-between mb-1'>
+								<h4 className='font-bold text-[15px] text-slate-900 dark:text-white'>{r.name}</h4>
+								<span className='flex items-center gap-1 text-[11px] font-bold text-slate-500 bg-slate-100 dark:bg-white/[0.07] px-2 py-0.5 rounded-lg'>
+									<Users className='w-3 h-3' />
+									{r.capacity}
 								</span>
 							</div>
-							<p className='text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-3'>{item.wing}</p>
-							<div className='flex flex-wrap gap-1.5 mb-4 mt-auto'>
-								{item.amenities.map(amenity => (
+							<p className='text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3'>{r.wing}</p>
+							<div className='flex flex-wrap gap-1 mb-3'>
+								{r.amenities.map(a => (
 									<span
-										key={amenity}
-										className='text-[9px] font-bold bg-black/5 dark:bg-white/5 text-slate-600 dark:text-gray-400 px-2 py-1 rounded border border-black/5 dark:border-white/5 uppercase tracking-wider'
+										key={a}
+										className='text-[9px] font-bold bg-black/[0.04] dark:bg-white/[0.05] text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded border border-black/[0.04] dark:border-white/[0.04] uppercase tracking-wider'
 									>
-										{amenity}
+										{a}
 									</span>
 								))}
 							</div>
-							<button className='w-full py-3 bg-siemens-petrol text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-siemens-glow transition-all active:scale-95'>
+							<button
+								onClick={() => onQuickBook?.(r)}
+								className='w-full py-2 bg-siemens-petrol text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-siemens-glow active:scale-95 transition-all shadow-sm shadow-siemens-petrol/20'
+							>
 								Quick Book
 							</button>
+							<button
+								onClick={() => onSelectRoom?.(r)}
+								className='w-full mt-2 py-2 border border-siemens-petrol/30 text-siemens-petrol rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-siemens-petrol/10 transition-all'
+							>
+								Use In Form
+							</button>
 						</div>
-					</article>
+					</div>
 				))}
 			</div>
 		</section>
