@@ -103,7 +103,7 @@ export default function AIChatPanel({
 					<div className='w-16 h-16 rounded-2xl bg-siemens-petrol flex items-center justify-center mb-5 shadow-lg'>
 						<Bot className='text-white w-8 h-8' />
 					</div>
-					<h3 className='text-2xl font-black mb-2 text-slate-900 dark:text-white'>Workspace AI</h3>
+					<h3 className='text-2xl font-black mb-2 text-slate-900 dark:text-white'>SmartSpace AI</h3>
 					<p className='text-slate-500 text-sm mb-6'>Ask to find rooms or draft invites.</p>
 					<span className='px-8 py-3 bg-siemens-petrol text-white rounded-full text-xs font-bold uppercase tracking-widest'>
 						Launch Console
@@ -189,7 +189,8 @@ export default function AIChatPanel({
 							onChange={event => setInput(event.target.value)}
 							disabled={isThinking}
 							type='text'
-							className='chat-input w-full bg-white dark:bg-[#0f151a] border border-black/5 dark:border-white/5 rounded-xl pl-4 pr-12 py-3.5 focus:outline-none focus:border-siemens-petrol focus:ring-1 focus:ring-siemens-petrol shadow-sm text-sm text-slate-900 dark:text-white transition-all'
+							className='chat-input w-full bg-white dark:bg-[#0f151a] border border-black/5 dark:border-white/5 rounded-xl pl-4 pr-12 py-3.5 focus:outline-none focus:border-siemens-petrol focus:ring-1 focus:ring-siemens-petrol shadow-sm text-slate-900 dark:text-white transition-all'
+							style={{ fontSize: '16px' }}
 							placeholder='Ask for a room...'
 						/>
 						<button
@@ -277,7 +278,8 @@ export default function AIChatPanel({
 									onChange={event => setInput(event.target.value)}
 									disabled={isThinking}
 									type='text'
-									className='w-full bg-white dark:bg-slate-900 border border-black/5 dark:border-slate-700 rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:border-siemens-petrol focus:ring-1 focus:ring-siemens-petrol text-sm text-slate-900 dark:text-white'
+									className='w-full bg-white dark:bg-slate-900 border border-black/5 dark:border-slate-700 rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:border-siemens-petrol focus:ring-1 focus:ring-siemens-petrol text-slate-900 dark:text-white'
+									style={{ fontSize: '16px' }}
 									placeholder='Ask for a room...'
 								/>
 								<button
