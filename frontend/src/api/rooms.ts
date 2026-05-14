@@ -47,3 +47,8 @@ export async function createRoom(roomPayload: RoomPayload) {
 	const response = await api.post<Room>('/api/rooms', roomPayload);
 	return response.data;
 }
+
+export async function deleteRoom(roomId: string) {
+	const response = await api.delete(`/api/rooms/${roomId}`);
+	return response.data;
+}

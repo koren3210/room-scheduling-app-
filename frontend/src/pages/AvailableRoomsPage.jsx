@@ -1,11 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import PageShell from '../components/PageShell.jsx';
+import RoomAvailabilityModal from '../components/RoomAvailabilityModal.jsx';
 import { fetchRooms } from '../api/rooms';
 
+function toLocalIso(date) {
+	if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+	const pad = value => String(value).padStart(2, '0');
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+		date.getMinutes(),
+	)}:00`;
+}
+
 export default function AvailableRoomsPage() {
+	const navigate = useNavigate();
 	const [wingFilter, setWingFilter] = useState('all');
 	const [sortBy, setSortBy] = useState('name');
+	const [availabilityOpen, setAvailabilityOpen] = useState(false);
+	const [selectedRoom, setSelectedRoom] = useState(null);
 
 	const roomsQuery = useQuery({
 		queryKey: ['available-rooms', wingFilter],
@@ -27,6 +40,22 @@ export default function AvailableRoomsPage() {
 
 	return (
 		<PageShell title='Available Rooms' subtitle='Browse all available spaces and sort quickly'>
+			<RoomAvailabilityModal
+				open={availabilityOpen}
+				room={selectedRoom}
+				onClose={() => setAvailabilityOpen(false)}
+				onSelectSlot={({ start, end, room }) => {
+					setAvailabilityOpen(false);
+					navigate('/dashboard/booking', {
+						state: {
+							roomToBook: room,
+							slotStart: toLocalIso(start),
+							slotEnd: toLocalIso(end),
+						},
+					});
+				}}
+			/>
+
 			<div className='mb-4 flex flex-wrap gap-2'>
 				<select
 					value={wingFilter}
@@ -84,6 +113,37 @@ export default function AvailableRoomsPage() {
 									</span>
 								))}
 							</div>
+							<button
+								type='button'
+								onClick={() => {
+									setSelectedRoom({
+										id: room._id || room.id,
+										name: room.name,
+										wing: room.wing,
+									});
+									setAvailabilityOpen(true);
+								}}
+								className='w-full mt-4 py-2 border border-siemens-petrol/30 text-siemens-petrol rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-siemens-petrol/10 transition-colors'
+							>
+								View Availability
+							</button>
+							<button
+								type='button'
+								onClick={() =>
+									navigate('/dashboard/booking', {
+										state: {
+											roomToBook: {
+												id: room._id || room.id,
+												name: room.name,
+												wing: room.wing,
+											},
+										},
+									})
+								}
+								className='w-full mt-2 py-2 bg-siemens-petrol text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-siemens-glow transition-colors'
+							>
+								Book
+							</button>
 						</div>
 					</div>
 				))}

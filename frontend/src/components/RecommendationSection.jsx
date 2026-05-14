@@ -1,8 +1,17 @@
+import { useRef } from 'react';
 import { Sparkles, Users } from 'lucide-react';
 
-export default function RecommendationSection({ recommendations, onQuickBook, onSelectRoom, onSeeAll }) {
+export default function RecommendationSection({ recommendations, onSelectRoom, onSeeAll }) {
+	const railRef = useRef(null);
+
+	const handleRailWheel = event => {
+		if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+		if (!railRef.current) return;
+		railRef.current.scrollLeft += event.deltaY;
+	};
+
 	return (
-		<section className='flex flex-col min-h-0'>
+		<section className='flex flex-col min-h-0 min-w-0'>
 			<div className='flex items-center justify-between gap-2 mb-4 shrink-0'>
 				<div className='flex items-center gap-2'>
 					<Sparkles className='w-4 h-4 text-amber-500' />
@@ -17,11 +26,15 @@ export default function RecommendationSection({ recommendations, onQuickBook, on
 				</button>
 			</div>
 
-			<div className='flex gap-4 overflow-x-auto pb-2 snap-x flex-1 min-h-0'>
+			<div
+				ref={railRef}
+				onWheel={handleRailWheel}
+				className='recommendation-rail flex gap-4 overflow-x-auto overflow-y-hidden pb-2 snap-x min-w-0 w-full cursor-grab active:cursor-grabbing'
+			>
 				{recommendations.map(r => (
 					<div
 						key={r.id || r._id}
-						className='flex-shrink-0 w-[300px] lg:w-[350px] h-[350px] snap-center bg-white/80 dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl overflow-hidden hover:scale-[1.01] transition-transform shadow-sm flex flex-col'
+						className='select-none flex-shrink-0 w-[300px] lg:w-[350px] h-[290px] snap-center bg-white/80 dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl overflow-hidden hover:scale-[1.01] transition-transform shadow-sm flex flex-col'
 					>
 						<div className='relative h-32 overflow-hidden'>
 							<img
@@ -29,7 +42,8 @@ export default function RecommendationSection({ recommendations, onQuickBook, on
 									r.image || 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80'
 								}
 								alt={r.name}
-								className='w-full h-full object-cover'
+								draggable={false}
+								className='w-full h-full object-cover pointer-events-none'
 							/>
 							<div className='absolute inset-0 bg-gradient-to-t from-black/40 to-transparent' />
 							<div className='absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 dark:bg-black/80 backdrop-blur px-2 py-1 rounded-full'>
@@ -56,18 +70,12 @@ export default function RecommendationSection({ recommendations, onQuickBook, on
 									</span>
 								))}
 							</div>
-							<div className='mt-auto'>
-								<button
-									onClick={() => onQuickBook?.(r)}
-									className='w-full py-2 bg-siemens-petrol text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-siemens-glow active:scale-95 transition-all shadow-sm shadow-siemens-petrol/20'
-								>
-									Quick Book
-								</button>
+							<div className='mt-1'>
 								<button
 									onClick={() => onSelectRoom?.(r)}
-									className='w-full mt-2 py-2 border border-siemens-petrol/30 text-siemens-petrol rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-siemens-petrol/10 transition-all'
+									className='w-full py-2 bg-siemens-petrol text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-siemens-glow active:scale-95 transition-all shadow-sm shadow-siemens-petrol/20'
 								>
-									Use In Form
+									Book
 								</button>
 							</div>
 						</div>

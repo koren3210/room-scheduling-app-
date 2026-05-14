@@ -52,13 +52,22 @@ export interface Booking {
 	notes?: string;
 }
 
-export async function fetchBookings(filter?: { userId?: string; roomId?: string; status?: string; mine?: boolean }) {
+export async function fetchBookings(filter?: {
+	userId?: string;
+	roomId?: string;
+	status?: string;
+	mine?: boolean;
+	start?: string;
+	end?: string;
+}) {
 	const params: Record<string, string> = {};
 
 	if (filter?.userId) params.userId = filter.userId;
 	if (filter?.roomId) params.roomId = filter.roomId;
 	if (filter?.status) params.status = filter.status;
 	if (filter?.mine) params.mine = 'true';
+	if (filter?.start) params.start = filter.start;
+	if (filter?.end) params.end = filter.end;
 
 	const response = await api.get<Booking[]>('/api/bookings', { params });
 	return response.data;

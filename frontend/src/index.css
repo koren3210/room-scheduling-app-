@@ -20,7 +20,6 @@ body {
 	height: 100%;
 	margin: 0;
 	scroll-behavior: smooth;
-	overflow-x: hidden;
 }
 
 body {
@@ -180,4 +179,242 @@ img {
 /* ─── Safe area (mobile bottom nav) ─────────────────── */
 .safe-area-bottom {
 	padding-bottom: env(safe-area-inset-bottom, 8px);
+}
+
+.recommendation-rail {
+	-webkit-overflow-scrolling: touch;
+	overscroll-behavior-x: contain;
+	touch-action: pan-x pan-y;
+	scrollbar-width: thin;
+}
+
+.recommendation-rail img {
+	-webkit-user-drag: none;
+	user-select: none;
+}
+
+/* Facility map radar */
+.facility-map-shell {
+	padding: 16px;
+	overflow: auto;
+	max-height: 78vh;
+	background:
+		radial-gradient(circle at 12% 8%, rgba(0, 153, 153, 0.08), transparent 42%),
+		radial-gradient(circle at 85% 15%, rgba(14, 165, 233, 0.06), transparent 40%),
+		linear-gradient(180deg, rgba(248, 250, 252, 0.9), rgba(241, 245, 249, 0.7));
+}
+
+.dark .facility-map-shell {
+	background:
+		radial-gradient(circle at 12% 8%, rgba(0, 153, 153, 0.2), transparent 42%),
+		radial-gradient(circle at 85% 15%, rgba(14, 165, 233, 0.15), transparent 40%),
+		linear-gradient(180deg, rgba(10, 16, 24, 0.95), rgba(6, 10, 15, 0.95));
+}
+
+.mappedin-embed-frame {
+	display: block;
+	border-radius: 12px;
+	overflow: hidden;
+	transition: filter 0.24s ease;
+}
+
+/* Free-plan fallback: approximate dark mode for cross-origin iframe content. */
+.dark .mappedin-embed-frame {
+	filter: invert(0.92) hue-rotate(180deg) saturate(0.82) brightness(0.88) contrast(0.96);
+}
+
+.facility-map-page {
+	margin: 0 auto 14px;
+	width: fit-content;
+	box-shadow: 0 12px 30px rgba(2, 6, 23, 0.08);
+	border-radius: 12px;
+	overflow: hidden;
+	border: 1px solid rgba(15, 23, 42, 0.08);
+	background: white;
+}
+
+.dark .facility-map-page {
+	border-color: rgba(255, 255, 255, 0.12);
+	box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.facility-map-hit {
+	padding: 1px 4px;
+	border-radius: 6px;
+	font-weight: 800;
+	letter-spacing: 0.02em;
+	border: 1px solid transparent;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+.facility-map-hit--available {
+	color: #065f46;
+	background: rgba(16, 185, 129, 0.22);
+	border-color: rgba(16, 185, 129, 0.45);
+}
+
+.facility-map-hit--pending {
+	color: #92400e;
+	background: rgba(245, 158, 11, 0.24);
+	border-color: rgba(245, 158, 11, 0.46);
+}
+
+.facility-map-hit--occupied {
+	color: #9f1239;
+	background: rgba(244, 63, 94, 0.2);
+	border-color: rgba(244, 63, 94, 0.46);
+}
+
+.dark .facility-map-hit--available {
+	color: #6ee7b7;
+	background: rgba(16, 185, 129, 0.16);
+}
+
+.dark .facility-map-hit--pending {
+	color: #fcd34d;
+	background: rgba(245, 158, 11, 0.2);
+}
+
+.dark .facility-map-hit--occupied {
+	color: #fda4af;
+	background: rgba(244, 63, 94, 0.18);
+}
+
+/* Room availability calendar */
+.room-availability-calendar {
+	--fc-border-color: rgba(15, 23, 42, 0.12);
+	--fc-page-bg-color: transparent;
+	--fc-neutral-bg-color: rgba(15, 23, 42, 0.02);
+	--fc-today-bg-color: rgba(0, 153, 153, 0.08);
+	--fc-event-bg-color: rgba(225, 29, 72, 0.9);
+	--fc-event-border-color: rgba(225, 29, 72, 0.95);
+	--fc-event-text-color: #ffffff;
+}
+
+.room-availability-calendar .fc {
+	font-size: 0.85rem;
+}
+
+.room-availability-calendar .fc .fc-toolbar-title {
+	font-size: 1rem;
+	font-weight: 800;
+	color: #0f172a;
+}
+
+.room-availability-calendar .fc .fc-button {
+	background: #009999;
+	border-color: #009999;
+	text-transform: uppercase;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+	font-size: 0.68rem;
+	padding: 0.4rem 0.55rem;
+}
+
+.room-availability-calendar .fc .fc-button:hover,
+.room-availability-calendar .fc .fc-button:focus {
+	background: #007f7f;
+	border-color: #007f7f;
+}
+
+.room-availability-calendar .fc .fc-button-primary:not(:disabled).fc-button-active {
+	background: #0f172a;
+	border-color: #0f172a;
+}
+
+.room-availability-calendar .fc .room-busy-event {
+	border-radius: 8px;
+	font-size: 0.72rem;
+	font-weight: 700;
+	padding: 3px 5px;
+}
+
+.room-availability-calendar .fc .fc-timegrid-axis {
+	width: 44px;
+}
+
+.room-availability-calendar .fc .fc-timegrid-axis-cushion,
+.room-availability-calendar .fc .fc-timegrid-slot-label-cushion {
+	padding-left: 0;
+	padding-right: 4px;
+	font-size: 0.68rem;
+	text-align: right;
+}
+
+.room-availability-calendar .fc .fc-timegrid-slot-minor {
+	border-top-style: dotted;
+}
+
+.room-availability-calendar .fc-room-event-content {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.room-availability-calendar .fc-room-event-title {
+	font-size: 0.72rem;
+	font-weight: 700;
+	line-height: 1.1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.room-availability-calendar .fc-room-event-avatars {
+	display: flex;
+	align-items: center;
+	gap: 0;
+	margin-left: 1px;
+}
+
+.room-availability-calendar .fc-room-event-avatar {
+	width: 18px;
+	height: 18px;
+	border-radius: 999px;
+	object-fit: cover;
+	border: 1.8px solid rgba(255, 255, 255, 0.95);
+	margin-left: -3px;
+}
+
+.room-availability-calendar .fc-room-event-avatar:first-child {
+	margin-left: 0;
+}
+
+.room-availability-calendar .fc-room-event-more {
+	margin-left: 4px;
+	font-size: 0.64rem;
+	font-weight: 800;
+	line-height: 1;
+	opacity: 0.95;
+}
+
+.room-availability-calendar .fc-room-event-names {
+	font-size: 0.62rem;
+	font-weight: 600;
+	line-height: 1.1;
+	opacity: 0.96;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.room-availability-calendar .fc .fc-highlight {
+	background: rgba(0, 153, 153, 0.25);
+}
+
+body.dark .room-availability-calendar {
+	--fc-border-color: rgba(255, 255, 255, 0.12);
+	--fc-neutral-bg-color: rgba(255, 255, 255, 0.04);
+	--fc-today-bg-color: rgba(0, 153, 153, 0.2);
+}
+
+body.dark .room-availability-calendar .fc .fc-toolbar-title,
+body.dark .room-availability-calendar .fc .fc-col-header-cell-cushion,
+body.dark .room-availability-calendar .fc .fc-timegrid-axis-cushion,
+body.dark .room-availability-calendar .fc .fc-timegrid-slot-label-cushion,
+body.dark .room-availability-calendar .fc .fc-daygrid-day-number,
+body.dark .room-availability-calendar .fc .fc-list-day-text,
+body.dark .room-availability-calendar .fc .fc-list-day-side-text {
+	color: #e2e8f0;
 }

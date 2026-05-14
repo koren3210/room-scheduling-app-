@@ -10,7 +10,7 @@ export default function FacilitySection({ rooms }) {
 				{[
 					{ label: 'Occupancy', value: '72%', accent: false },
 					{ label: 'Available', value: availableCount, accent: false },
-					{ label: 'Active Wings', value: 'A, B, C', accent: false },
+					{ label: 'Active Wings', value: 'B, C, D', accent: false },
 					{ label: 'Energy Save', value: '12kW', accent: true },
 				].map(stat => (
 					<div

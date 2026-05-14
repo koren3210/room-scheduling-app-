@@ -5,58 +5,92 @@ const router = express.Router();
 // Utility to fetch all rooms and users for context
 const Room = require('../models/Room');
 const User = require('../models/User');
+const Booking = require('../models/Booking');
 
-function parseDateTimeFallback(rawMessage) {
+// Returns a local ISO string "YYYY-MM-DDTHH:MM:SS" (no Z) from a Date using its
+// numeric components so the frontend parses it as the user's local time.
+function toLocalISOString(date) {
+	const pad = n => String(n).padStart(2, '0');
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+}
+
+// clientNow is a local ISO string like "2026-05-13T15:30:00" sent from the browser.
+// We use it to derive the correct base date so server timezone never matters.
+function parseDateTimeFallback(rawMessage, clientNow) {
 	const message = String(rawMessage || '').toLowerCase();
-	const now = new Date();
-	let baseDate = new Date(now);
 
-	// Handle common natural-language day hints (including common typos).
-	if (/(tomorrow|tommorow|tommorrow)/i.test(message)) {
-		baseDate.setDate(baseDate.getDate() + 1);
+	// Parse base date components from the client's local time string.
+	let baseYear, baseMonth, baseDay;
+	if (clientNow) {
+		const m = String(clientNow).match(/^(\d{4})-(\d{2})-(\d{2})/);
+		if (m) {
+			baseYear = parseInt(m[1], 10);
+			baseMonth = parseInt(m[2], 10) - 1; // 0-indexed
+			baseDay = parseInt(m[3], 10);
+		}
+	}
+	if (!baseYear) {
+		// Fallback: use server date (best effort)
+		const now = new Date();
+		baseYear = now.getFullYear();
+		baseMonth = now.getMonth();
+		baseDay = now.getDate();
 	}
 
-	const hourMatch = message.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+	// Handle common natural-language day hints.
+	if (/(tomorrow|tommorow|tommorrow)/i.test(message)) {
+		const tmp = new Date(baseYear, baseMonth, baseDay + 1);
+		baseYear = tmp.getFullYear();
+		baseMonth = tmp.getMonth();
+		baseDay = tmp.getDate();
+	}
+
+	// Require either HH:MM or "H am/pm" so bare numbers like "3 people" are never matched.
+	const hourMatch = message.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b|\b(\d{1,2})\s+(am|pm)\b/i);
 	if (!hourMatch) return null;
 
-	let hours = Number(hourMatch[1]);
-	const minutes = hourMatch[2] ? Number(hourMatch[2]) : 0;
-	const period = hourMatch[3] ? hourMatch[3].toLowerCase() : null;
+	let hours, minutes, period;
+	if (hourMatch[1] !== undefined) {
+		// Matched HH:MM[:SS] [am/pm]
+		hours = Number(hourMatch[1]);
+		minutes = Number(hourMatch[2]);
+		period = hourMatch[3] ? hourMatch[3].toLowerCase() : null;
+	} else {
+		// Matched H am/pm
+		hours = Number(hourMatch[4]);
+		minutes = 0;
+		period = hourMatch[5] ? hourMatch[5].toLowerCase() : null;
+	}
 
 	if (period === 'pm' && hours < 12) hours += 12;
 	if (period === 'am' && hours === 12) hours = 0;
 
-	const startAt = new Date(baseDate);
-	startAt.setSeconds(0, 0);
-	startAt.setHours(hours, minutes, 0, 0);
-
-	// If no day keyword was supplied and time is already passed today, roll to tomorrow.
-	if (!/(tomorrow|tommorow|tommorrow)/i.test(message) && startAt <= now) {
-		startAt.setDate(startAt.getDate() + 1);
-	}
-
+	// Build Date objects using LOCAL component constructors so JS handles overflow.
+	const startAt = new Date(baseYear, baseMonth, baseDay, hours, minutes, 0, 0);
 	const endAt = new Date(startAt.getTime() + 60 * 60 * 1000);
+
+	// Return as local ISO strings (no Z) — frontend will parse as local time.
 	return {
-		startAt: startAt.toISOString(),
-		endAt: endAt.toISOString(),
+		startAt: toLocalISOString(startAt),
+		endAt: toLocalISOString(endAt),
 	};
 }
 
 // POST /api/ai/parse-booking
 router.post('/parse-booking', async (req, res) => {
 	try {
-		const { message } = req.body;
+		const { message, clientNow } = req.body;
 		if (!message) return res.status(400).json({ error: 'Missing message' });
 
 		console.log('📨 AI request received:', message);
 		console.log('🔑 process.env.GOOGLE_AI_API_KEY exists?', !!process.env.GOOGLE_AI_API_KEY);
 		console.log('🔑 process.env.GOOGLE_AI_API_KEY value:', process.env.GOOGLE_AI_API_KEY?.substring(0, 10) + '...');
 
-		// Fetch context for grounding
-		const rooms = await Room.find({});
+		// Fetch context for grounding — only rooms marked available
+		const rooms = await Room.find({ isAvailable: true });
 		const users = await User.find({});
 
-		console.log(`📦 Context: ${rooms.length} rooms, ${users.length} users`);
+		console.log(`📦 Context: ${rooms.length} available rooms, ${users.length} users`);
 
 		// Build compact, relevant context to prevent token truncation
 		const lowerMessage = message.toLowerCase();
@@ -77,6 +111,39 @@ router.post('/parse-booking', async (req, res) => {
 			});
 		}
 		if (!roomCandidates.length) roomCandidates = [...rooms];
+
+		// Exclude rooms that have a confirmed/pending booking overlapping the requested window.
+		// Derive the requested window from clientNow + message so we can query before the AI responds.
+		const requestedWindow = parseDateTimeFallback(message, clientNow);
+		if (requestedWindow) {
+			const winStart = new Date(requestedWindow.startAt);
+			const winEnd = new Date(requestedWindow.endAt);
+			const busyBookings = await Booking.find({
+				status: { $in: ['pending', 'confirmed'] },
+				startAt: { $lt: winEnd },
+				endAt: { $gt: winStart },
+			})
+				.select('room')
+				.lean();
+			const busyRoomIds = new Set(busyBookings.map(b => String(b.room)));
+			const before = roomCandidates.length;
+			const blockedRooms = roomCandidates.filter(r => busyRoomIds.has(String(r._id)));
+			roomCandidates = roomCandidates.filter(r => !busyRoomIds.has(String(r._id)));
+			console.log(
+				`🚫 Excluded ${before - roomCandidates.length} booked rooms for window ${requestedWindow.startAt} – ${requestedWindow.endAt}`,
+			);
+
+			// If every matching room is occupied for that window, return a clear message immediately.
+			if (roomCandidates.length === 0 && before > 0) {
+				const blockedNames = blockedRooms.map(r => `${r.name} (${r.wing})`).join(', ');
+				const timeStr = `${requestedWindow.startAt.slice(11, 16)} – ${requestedWindow.endAt.slice(11, 16)}`;
+				console.log(`⛔ All matching rooms are booked at ${timeStr}: ${blockedNames}`);
+				return res.json({
+					error: `All rooms matching your request are already booked at ${timeStr}. Rooms unavailable: ${blockedNames}. Please try a different time or different criteria.`,
+				});
+			}
+		}
+
 		roomCandidates = roomCandidates.slice(0, 10);
 
 		const searchableWords = lowerMessage
@@ -105,6 +172,8 @@ router.post('/parse-booking', async (req, res) => {
 
 REQUEST: ${message}
 
+USER'S CURRENT LOCAL TIME: ${clientNow || new Date().toISOString().slice(0, 19)}
+
 ROOMS (name|wing|capacity|amenities|id):
 ${roomList}
 
@@ -119,7 +188,8 @@ Rules:
 - roomId must be an id from ROOMS.
 - attendees must be user ids from USERS.
 - purpose should be short text.
-- If time not clear, keep startAt/endAt as null.`;
+- If time not clear, keep startAt/endAt as null.
+- startAt and endAt MUST be in LOCAL time format "YYYY-MM-DDTHH:MM:SS" (no Z, no UTC offset). Base all date/time calculations on the USER'S CURRENT LOCAL TIME above.`;
 
 		console.log('🧠 Prompt token estimate: ~', prompt.length / 4, 'tokens');
 
@@ -184,7 +254,7 @@ Rules:
 
 		// Deterministic fallback for time/date when AI returns null.
 		if (!parsed.startAt || !parsed.endAt) {
-			const fallbackDateTime = parseDateTimeFallback(message);
+			const fallbackDateTime = parseDateTimeFallback(message, clientNow);
 			if (fallbackDateTime) {
 				parsed.startAt = parsed.startAt || fallbackDateTime.startAt;
 				parsed.endAt = parsed.endAt || fallbackDateTime.endAt;

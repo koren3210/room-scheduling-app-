@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DatePicker from 'react-datepicker';
-import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { CalendarClock } from 'lucide-react';
 import 'react-datepicker/dist/react-datepicker.css';
 import PageShell from '../components/PageShell.jsx';
 import AIChatPanel from '../components/AIChatPanel.jsx';
 import RecommendationSection from '../components/RecommendationSection.jsx';
+import RoomAvailabilityModal from '../components/RoomAvailabilityModal.jsx';
 import { fetchRooms } from '../api/rooms';
 import { createBooking } from '../api/bookings';
 import { fetchUsers } from '../api/users';
@@ -27,8 +30,10 @@ function parseAIDate(value) {
 	if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
 	if (typeof value !== 'string') return null;
 
-	// Handle local datetime string formats like "2026-05-13 11:00" reliably.
-	const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+	// Strip trailing Z: AI is instructed to return local time without Z, but guard
+	// against any UTC-marked response so the time is always treated as local.
+	const local = value.endsWith('Z') ? value.slice(0, -1) : value;
+	const normalized = local.includes('T') ? local : local.replace(' ', 'T');
 	const date = new Date(normalized);
 	if (Number.isNaN(date.getTime())) return null;
 	return date;
@@ -36,8 +41,12 @@ function parseAIDate(value) {
 
 export default function BookingPage() {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const queryClient = useQueryClient();
 	const { user } = useAuth();
+	const roomFromNavigation = location.state?.roomToBook;
+	const slotStartFromNavigation = parseAIDate(location.state?.slotStart);
+	const slotEndFromNavigation = parseAIDate(location.state?.slotEnd);
 	const firstName = user?.name?.trim()?.split(/\s+/)?.[0] || 'there';
 	const [messages, setMessages] = useState([
 		{
@@ -48,15 +57,16 @@ export default function BookingPage() {
 	]);
 	const [aiPending, setAiPending] = useState(false);
 	const [mobileChatOpen, setMobileChatOpen] = useState(false);
-	const [bookingModalOpen, setBookingModalOpen] = useState(false);
+	const [bookingModalOpen, setBookingModalOpen] = useState(Boolean(roomFromNavigation));
+	const [availabilityModalOpen, setAvailabilityModalOpen] = useState(false);
 	const initialWindow = useMemo(() => nextHalfHourWindow(), []);
-	const [selectedAttendees, setSelectedAttendees] = useState([]);
+	const [selectedAttendees, setSelectedAttendees] = useState(roomFromNavigation && user?.id ? [user.id] : []);
 	const [form, setForm] = useState({
-		room: '',
-		wing: 'Wing A',
-		startAt: initialWindow.start,
-		endAt: initialWindow.end,
-		purpose: 'Team sync',
+		room: roomFromNavigation?.id || roomFromNavigation?._id || '',
+		wing: roomFromNavigation?.wing || 'Wing A',
+		startAt: slotStartFromNavigation || initialWindow.start,
+		endAt: slotEndFromNavigation || initialWindow.end,
+		purpose: roomFromNavigation?.name ? `Meeting in ${roomFromNavigation.name}` : 'Team sync',
 	});
 
 	const roomsQuery = useQuery({
@@ -194,18 +204,6 @@ export default function BookingPage() {
 			room.images?.[0] || 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80',
 	}));
 
-	const handleQuickBook = selectedRoom => {
-		const { start, end } = nextHalfHourWindow();
-		bookingMutation.mutate({
-			room: selectedRoom.id || selectedRoom._id,
-			wing: selectedRoom.wing,
-			startAt: start.toISOString(),
-			endAt: end.toISOString(),
-			purpose: `Quick booking for ${selectedRoom.name}`,
-			attendeeUsers: user?.id ? [user.id] : [],
-		});
-	};
-
 	// Accepts optional aiPrefill for purpose and attendees
 	const handleUseInForm = (selectedRoom, aiPrefill = {}) => {
 		const fallbackWindow = nextHalfHourWindow();
@@ -228,12 +226,14 @@ export default function BookingPage() {
 			attendees.push(user.id);
 		}
 		setSelectedAttendees(attendees);
+		setMobileChatOpen(false);
 		setBookingModalOpen(true);
 	};
 
 	const handleOpenForm = () => {
 		// Always include the current user when opening a blank form
 		setSelectedAttendees(user?.id ? [user.id] : []);
+		setMobileChatOpen(false);
 		setBookingModalOpen(true);
 	};
 
@@ -261,117 +261,172 @@ export default function BookingPage() {
 		setSelectedAttendees(curr => (curr.includes(id) ? curr.filter(item => item !== id) : [...curr, id]));
 	};
 
+	const openAvailability = () => {
+		if (!selectedCalendarRoom) {
+			toast.warn('Select a room first to view availability.');
+			return;
+		}
+		setAvailabilityModalOpen(true);
+	};
+
+	let selectedCalendarRoom = null;
+	if (form.room) {
+		const room = (roomsQuery.data || []).find(item => (item._id || item.id) === form.room);
+		if (room) {
+			selectedCalendarRoom = {
+				id: room._id || room.id,
+				name: room.name,
+				wing: room.wing,
+			};
+		}
+	}
+
 	return (
 		<>
-			{bookingModalOpen && (
-				<div className='fixed inset-0 z-[100000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4'>
-					<div className='w-full max-w-2xl bg-white dark:bg-[#0f151a] rounded-2xl border border-black/10 dark:border-white/10 p-5'>
-						<div className='flex items-center justify-between mb-4'>
-							<h3 className='text-sm font-bold text-slate-900 dark:text-white'>Create Booking</h3>
-							<button
-								type='button'
-								onClick={() => setBookingModalOpen(false)}
-								className='text-slate-500 hover:text-slate-900 dark:hover:text-white'
-							>
-								Close
-							</button>
-						</div>
+			<RoomAvailabilityModal
+				open={availabilityModalOpen}
+				room={selectedCalendarRoom}
+				onClose={() => setAvailabilityModalOpen(false)}
+				onSelectSlot={({ start, end }) => {
+					setForm(curr => ({
+						...curr,
+						startAt: start || curr.startAt,
+						endAt: end || curr.endAt,
+					}));
+					setAvailabilityModalOpen(false);
+				}}
+			/>
 
-						<form onSubmit={handleSubmitForm} className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-							<select
-								value={form.room}
-								onChange={event => {
-									const selectedRoom = (roomsQuery.data || []).find(room => (room._id || room.id) === event.target.value);
-									setForm(curr => ({
-										...curr,
-										room: event.target.value,
-										wing: selectedRoom?.wing || curr.wing,
-									}));
-								}}
-								className='bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-sm'
-								required
-							>
-								<option value=''>Select room</option>
-								{(roomsQuery.data || []).map(room => (
-									<option key={room._id || room.id} value={room._id || room.id}>
-										{room.name} ({room.wing})
-									</option>
-								))}
-							</select>
-
-							<input
-								type='text'
-								value={form.purpose}
-								onChange={event => setForm(curr => ({ ...curr, purpose: event.target.value }))}
-								placeholder='Purpose'
-								className='bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-sm'
-							/>
-
-							<div>
-								<p className='text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1'>Start</p>
-								<DatePicker
-									selected={form.startAt}
-									onChange={date => setForm(curr => ({ ...curr, startAt: date || curr.startAt }))}
-									showTimeSelect
-									timeIntervals={15}
-									dateFormat='Pp'
-									className='w-full bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-sm'
-								/>
-							</div>
-
-							<div>
-								<p className='text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1'>End</p>
-								<DatePicker
-									selected={form.endAt}
-									onChange={date => setForm(curr => ({ ...curr, endAt: date || curr.endAt }))}
-									showTimeSelect
-									timeIntervals={15}
-									dateFormat='Pp'
-									minDate={form.startAt}
-									className='w-full bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-sm'
-								/>
-							</div>
-
-							<div className='md:col-span-2'>
-								<p className='text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2'>Attendees</p>
-								<div className='flex flex-wrap gap-2 max-h-28 overflow-y-auto'>
-									{(usersQuery.data || []).map(option => (
-										<button
-											type='button'
-											key={option.id}
-											onClick={() => toggleAttendee(option.id)}
-											className={`px-2 py-1 rounded-lg border text-xs ${
-												selectedAttendees.includes(option.id)
-													? 'bg-siemens-petrol text-white border-siemens-petrol'
-													: 'bg-white dark:bg-slate-900 border-black/10 dark:border-white/10 text-slate-600 dark:text-slate-200'
-											}`}
-										>
-											{option.name}
-										</button>
-									))}
-								</div>
-							</div>
-
-							<div className='md:col-span-2 flex items-center justify-end gap-2'>
+			{bookingModalOpen &&
+				typeof document !== 'undefined' &&
+				createPortal(
+					<div className='fixed inset-0 z-[100001] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4'>
+						<div
+							className='w-full max-w-2xl bg-white dark:bg-[#0f151a] rounded-2xl border border-black/10 dark:border-white/10 p-5 max-h-[90vh] overflow-y-auto overscroll-contain'
+							style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+						>
+							<div className='flex items-center justify-between mb-4'>
+								<h3 className='text-sm font-bold text-slate-900 dark:text-white'>Create Booking</h3>
 								<button
 									type='button'
 									onClick={() => setBookingModalOpen(false)}
-									className='px-4 py-2 border border-black/10 dark:border-white/10 rounded-xl text-xs font-black uppercase tracking-widest'
+									className='text-slate-500 hover:text-slate-900 dark:hover:text-white'
 								>
-									Cancel
-								</button>
-								<button
-									type='submit'
-									disabled={bookingMutation.isPending}
-									className='px-4 py-2 bg-siemens-petrol text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-60'
-								>
-									{bookingMutation.isPending ? 'Booking...' : 'Book Room'}
+									Close
 								</button>
 							</div>
-						</form>
-					</div>
-				</div>
-			)}
+
+							<form onSubmit={handleSubmitForm} className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+								<select
+									value={form.room}
+									onChange={event => {
+										const selectedRoom = (roomsQuery.data || []).find(room => (room._id || room.id) === event.target.value);
+										setForm(curr => ({
+											...curr,
+											room: event.target.value,
+											wing: selectedRoom?.wing || curr.wing,
+										}));
+									}}
+									className='bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-sm'
+									required
+								>
+									<option value=''>Select room</option>
+									{(roomsQuery.data || []).map(room => (
+										<option key={room._id || room.id} value={room._id || room.id}>
+											{room.name} ({room.wing})
+										</option>
+									))}
+								</select>
+
+								<input
+									type='text'
+									value={form.purpose}
+									onChange={event => setForm(curr => ({ ...curr, purpose: event.target.value }))}
+									placeholder='Purpose'
+									className='bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-sm'
+								/>
+
+								<div className='md:col-span-2'>
+									<div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+										<div>
+											<p className='text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1'>Start</p>
+											<DatePicker
+												selected={form.startAt}
+												onChange={date => setForm(curr => ({ ...curr, startAt: date || curr.startAt }))}
+												showTimeSelect
+												timeIntervals={15}
+												dateFormat='Pp'
+												className='w-full bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-sm'
+											/>
+										</div>
+
+										<div>
+											<p className='text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1'>End</p>
+											<div className='flex items-stretch gap-2'>
+												<DatePicker
+													selected={form.endAt}
+													onChange={date => setForm(curr => ({ ...curr, endAt: date || curr.endAt }))}
+													showTimeSelect
+													timeIntervals={15}
+													dateFormat='Pp'
+													minDate={form.startAt}
+													className='flex-1 w-full bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-sm'
+												/>
+												<button
+													type='button'
+													onClick={openAvailability}
+													className='h-[42px] w-[42px] inline-flex items-center justify-center rounded-xl border border-siemens-petrol/30 text-siemens-petrol hover:bg-siemens-petrol/10 transition-colors shrink-0'
+													title='View room availability'
+													aria-label='View room availability'
+												>
+													<CalendarClock className='w-4 h-4' />
+												</button>
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<div className='md:col-span-2'>
+									<p className='text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2'>Attendees</p>
+									<div className='flex flex-wrap gap-2'>
+										{(usersQuery.data || []).map(option => (
+											<button
+												type='button'
+												key={option.id}
+												onClick={() => toggleAttendee(option.id)}
+												className={`px-2 py-1 rounded-lg border text-xs ${
+													selectedAttendees.includes(option.id)
+														? 'bg-siemens-petrol text-white border-siemens-petrol'
+														: 'bg-white dark:bg-slate-900 border-black/10 dark:border-white/10 text-slate-600 dark:text-slate-200'
+												}`}
+											>
+												{option.name}
+											</button>
+										))}
+									</div>
+								</div>
+
+								<div className='md:col-span-2 flex items-center justify-end gap-2'>
+									<button
+										type='button'
+										onClick={() => setBookingModalOpen(false)}
+										className='px-4 py-2 border border-black/10 dark:border-white/10 rounded-xl text-xs font-black uppercase tracking-widest'
+									>
+										Cancel
+									</button>
+									<button
+										type='submit'
+										disabled={bookingMutation.isPending}
+										className='px-4 py-2 bg-siemens-petrol text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-60'
+									>
+										{bookingMutation.isPending ? 'Booking...' : 'Book Room'}
+									</button>
+								</div>
+							</form>
+						</div>
+					</div>,
+					document.body,
+				)}
 			<PageShell title={`Good afternoon, ${firstName}.`} subtitle='SiemensBooking is optimizing workspaces at the APC Site.'>
 				<div className='flex items-center justify-end mb-4'>
 					<button
@@ -383,7 +438,7 @@ export default function BookingPage() {
 					</button>
 				</div>
 
-				<div className='flex flex-col gap-6 min-h-0'>
+				<div className='flex flex-col gap-6 min-h-0 min-w-0'>
 					<AIChatPanel
 						messages={messages}
 						isThinking={aiPending}
@@ -396,7 +451,6 @@ export default function BookingPage() {
 					/>
 					<RecommendationSection
 						recommendations={recommendations}
-						onQuickBook={handleQuickBook}
 						onSelectRoom={handleUseInForm}
 						onSeeAll={() => navigate('/dashboard/rooms')}
 					/>

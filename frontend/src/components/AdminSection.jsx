@@ -1,14 +1,52 @@
 import { Trash2 } from 'lucide-react';
+import Modal from './Modal';
+import { useState } from 'react';
 
-const AMENITIES = ['Whiteboard', 'Smart Board', 'Quiet Zone', 'Telepresence', 'Dual Screens'];
+const AMENITIES = [
+	'Whiteboard',
+	'Quiet Room',
+	'Projector',
+	'Video Conference',
+	'TV Screen',
+	'Big Room',
+	'Small Room',
+	'Standing Desk',
+];
 
-export default function AdminSection({ adminRooms, onAddRoom }) {
+export default function AdminSection({ adminRooms, onAddRoom, onDeleteRoom }) {
+	const [selectedRoom, setSelectedRoom] = useState(null);
+	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [selectedAmenities, setSelectedAmenities] = useState([]);
+
+	const handleAmenityToggle = amenity => {
+		setSelectedAmenities(curr => (curr.includes(amenity) ? curr.filter(a => a !== amenity) : [...curr, amenity]));
+	};
+
+	const handleFormSubmit = e => {
+		e.preventDefault();
+		onAddRoom(e);
+		setSelectedAmenities([]);
+	};
+
+	const handleDeleteClick = room => {
+		setSelectedRoom(room);
+		setIsModalOpen(true);
+	};
+
+	const handleModalAction = action => {
+		if (action === 'approve' && selectedRoom) {
+			onDeleteRoom(selectedRoom.id);
+		}
+		setIsModalOpen(false);
+		setSelectedRoom(null);
+	};
+
 	return (
 		<div className='flex flex-col gap-6'>
 			{/* Registration form */}
 			<div className='bg-white/80 dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] p-8 rounded-2xl shadow-sm'>
 				<h3 className='text-base font-bold mb-6 text-slate-900 dark:text-white'>Register Workspace</h3>
-				<form onSubmit={onAddRoom} className='space-y-4'>
+				<form onSubmit={handleFormSubmit} className='space-y-4'>
 					<input
 						type='text'
 						name='name'
@@ -28,7 +66,6 @@ export default function AdminSection({ adminRooms, onAddRoom }) {
 							name='wing'
 							className='w-full bg-slate-50 dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.06] rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-siemens-petrol transition-all appearance-none'
 						>
-							<option>Wing A</option>
 							<option>Wing B</option>
 							<option>Wing C</option>
 							<option>Wing D</option>
@@ -42,51 +79,53 @@ export default function AdminSection({ adminRooms, onAddRoom }) {
 						<input
 							type='file'
 							name='image'
-							accept='image/*'
-							className='w-full bg-slate-50 dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.06] rounded-xl px-4 py-3 text-xs text-slate-600 dark:text-slate-300'
+							className='w-full bg-slate-50 dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.06] rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-siemens-petrol focus:ring-1 focus:ring-siemens-petrol transition-all'
 						/>
 					</div>
 
-					<div className='pt-1'>
-						<label className='block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3'>
-							Workspace Capabilities
-						</label>
+					<div>
+						<label className='block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2'>Amenities</label>
 						<div className='flex flex-wrap gap-2'>
 							{AMENITIES.map(amenity => (
-								<label
+								<button
+									type='button'
 									key={amenity}
-									className='flex items-center gap-2 bg-slate-50 dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] px-3 py-2 rounded-xl cursor-pointer hover:border-siemens-petrol/40 hover:text-siemens-petrol transition-colors text-xs font-medium text-slate-600 dark:text-slate-300'
+									onClick={() => handleAmenityToggle(amenity)}
+									className={`px-2 py-1 rounded-lg border text-xs transition-colors duration-100 font-bold uppercase tracking-widest ${
+										selectedAmenities.includes(amenity)
+											? 'bg-siemens-petrol text-white border-siemens-petrol'
+											: 'bg-white dark:bg-slate-900 border-black/10 dark:border-white/10 text-slate-600 dark:text-slate-200'
+									}`}
 								>
-									<input type='checkbox' value={amenity} className='w-3.5 h-3.5 accent-siemens-petrol rounded' />
-									<span>{amenity}</span>
-								</label>
+									{amenity}
+								</button>
 							))}
 						</div>
 					</div>
 
+					{/* Hidden input to pass amenities via FormData */}
+					<input type='hidden' name='amenitiesJson' value={JSON.stringify(selectedAmenities)} />
+
 					<button
 						type='submit'
-						className='w-full mt-2 py-3 bg-siemens-petrol text-white rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-md shadow-siemens-petrol/20 hover:bg-siemens-glow active:scale-[0.98] transition-all'
+						className='w-full bg-siemens-petrol text-white rounded-xl px-4 py-3 text-sm font-bold hover:bg-siemens-petrol-dark focus:outline-none focus:ring-2 focus:ring-siemens-petrol focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-black transition-all'
 					>
-						Add to Registry
+						Add Room
 					</button>
 				</form>
 			</div>
 
-			{/* Database list */}
-			<div className='bg-white/80 dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] p-8 rounded-2xl shadow-sm flex flex-col min-h-[300px]'>
-				<h3 className='text-base font-bold mb-5 text-slate-400 dark:text-slate-500'>Database</h3>
-				<div className='flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar'>
+			{/* Room list */}
+			<div className='bg-white/80 dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] p-8 rounded-2xl shadow-sm'>
+				<h3 className='text-base font-bold mb-6 text-slate-900 dark:text-white'>Manage Rooms</h3>
+				<div className='space-y-4'>
 					{adminRooms.map(room => (
 						<div
 							key={room.id}
-							className='p-4 bg-slate-50 dark:bg-white/[0.04] border border-black/[0.04] dark:border-white/[0.04] rounded-xl flex justify-between items-center'
+							className='flex items-center justify-between bg-slate-50 dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.06] rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-white'
 						>
 							<div>
-								<p className='text-sm font-bold text-slate-900 dark:text-white'>
-									{room.name}
-									<span className='text-[9px] text-slate-400 ml-2 uppercase tracking-widest font-black'>{room.wing}</span>
-								</p>
+								<h4 className='font-bold'>{room.name}</h4>
 								<div className='mt-1.5 flex flex-wrap gap-1'>
 									{room.amenities.map(tag => (
 										<span
@@ -98,7 +137,10 @@ export default function AdminSection({ adminRooms, onAddRoom }) {
 									))}
 								</div>
 							</div>
-							<button className='text-rose-400 hover:text-rose-600 hover:scale-110 transition-all p-1 ml-4 shrink-0'>
+							<button
+								className='text-rose-400 hover:text-rose-600 hover:scale-110 transition-all p-1 ml-4 shrink-0'
+								onClick={() => handleDeleteClick(room)}
+							>
 								<Trash2 className='w-4 h-4' />
 								<span className='sr-only'>Delete {room.name}</span>
 							</button>
@@ -106,6 +148,16 @@ export default function AdminSection({ adminRooms, onAddRoom }) {
 					))}
 				</div>
 			</div>
+
+			{/* Modal */}
+			{isModalOpen && (
+				<Modal
+					title='Confirm Deletion'
+					message={`Are you sure you want to delete the room "${selectedRoom?.name}"?`}
+					onApprove={() => handleModalAction('approve')}
+					onDecline={() => handleModalAction('decline')}
+				/>
+			)}
 		</div>
 	);
 }

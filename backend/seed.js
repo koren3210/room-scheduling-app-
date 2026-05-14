@@ -6,7 +6,6 @@ const Room = require('./models/Room');
 const Booking = require('./models/Booking');
 
 const DEFAULT_WINGS = [
-	{ key: 'Wing A', name: 'Wing A', description: 'Corporate offices and strategy rooms', sortOrder: 1 },
 	{ key: 'Wing B', name: 'Wing B', description: 'Technology and collaboration spaces', sortOrder: 2 },
 	{ key: 'Wing C', name: 'Wing C', description: 'Training and event facilities', sortOrder: 3 },
 	{ key: 'Wing D', name: 'Wing D', description: 'Executive suites and private offices', sortOrder: 4 },
@@ -39,42 +38,28 @@ const DEMO_USERS = [
 ];
 
 const ROOM_TEMPLATES = {
-	'Wing A': [
-		{ roomNumber: 'A101', name: 'Strategy Room', capacity: 8, amenities: ['Projector', 'Whiteboard', 'Video Conferencing'] },
-		{ roomNumber: 'A102', name: 'Summit Hub', capacity: 10, amenities: ['Whiteboard', 'HD Display'] },
-		{ roomNumber: 'A103', name: 'Atlas Boardroom', capacity: 14, amenities: ['Video Conferencing', 'Conference Phone'] },
-		{ roomNumber: 'A104', name: 'Focus Cabin 1', capacity: 4, amenities: ['Monitor', 'Whiteboard'] },
-		{ roomNumber: 'A105', name: 'Focus Cabin 2', capacity: 4, amenities: ['Monitor', 'Whiteboard'] },
-		{ roomNumber: 'A106', name: 'Client Lounge', capacity: 12, amenities: ['Projector', 'Coffee Station'] },
+	'Wing D': [
+		{ roomNumber: 'D-Gilboa', name: 'Gilboa', capacity: 20, amenities: ['Big Room', 'TV Screen'] },
+		{ roomNumber: 'D-Hermon', name: 'Hermon', capacity: 10, amenities: ['Big Room', 'TV Screen', 'Whiteboard'] },
+		{ roomNumber: 'D-Arava', name: 'Arava', capacity: 2, amenities: ['Small Room', 'TV Screen', 'Whiteboard'] },
+		{ roomNumber: 'D-Sharon', name: 'Sharon', capacity: 18, amenities: ['Big Room', 'TV Screen', 'Whiteboard'] },
+		{ roomNumber: 'D-Carmel', name: 'Carmel', capacity: 8, amenities: ['Whiteboard'] },
+		{ roomNumber: 'D-Galil', name: 'Galil', capacity: 3, amenities: ['Whiteboard', 'Small Room', 'Quiet Room'] },
 	],
 	'Wing B': [
-		{ roomNumber: 'B201', name: 'Beta Lab', capacity: 10, amenities: ['Video Conferencing', 'Smart Display'] },
-		{ roomNumber: 'B202', name: 'Collaboration Suite', capacity: 12, amenities: ['Whiteboard', 'Conference Phone'] },
-		{ roomNumber: 'B203', name: 'Neon Studio', capacity: 6, amenities: ['LED Wall', 'Monitor'] },
-		{ roomNumber: 'B204', name: 'Sprint Room', capacity: 8, amenities: ['Kanban Wall', 'Whiteboard'] },
-		{ roomNumber: 'B205', name: 'Pairing Pod', capacity: 4, amenities: ['Dual Monitor', 'Whiteboard'] },
-		{
-			roomNumber: 'B206',
-			name: 'Ops Command',
-			capacity: 16,
-			amenities: ['Video Conferencing', 'Smart Display', 'Conference Phone'],
-		},
+		{ roomNumber: 'B-Iris', name: 'Iris', capacity: 4, amenities: ['Small Room', 'Quiet Room', 'Whiteboard'] },
+		{ roomNumber: 'B-Yasmin', name: 'Yasmin', capacity: 4, amenities: ['Small Room', 'Quiet Room', 'Whiteboard'] },
+		{ roomNumber: 'B-Marganit', name: 'Marganit', capacity: 4, amenities: ['Small Room', 'Quiet Room', 'Whiteboard'] },
+		{ roomNumber: 'B-Nakis', name: 'Nakis', capacity: 8, amenities: ['Small Room', 'Whiteboard', 'TV Screen'] },
 	],
 	'Wing C': [
-		{ roomNumber: 'C301', name: 'Training Lab', capacity: 20, amenities: ['Training Pods', 'Smart Display'] },
-		{ roomNumber: 'C302', name: 'Mentor Hall', capacity: 18, amenities: ['Projector', 'Whiteboard'] },
-		{ roomNumber: 'C303', name: 'Workshop Arena', capacity: 24, amenities: ['Projector', 'Audio System'] },
-		{ roomNumber: 'C304', name: 'Learning Nook', capacity: 8, amenities: ['Whiteboard', 'Monitor'] },
-		{ roomNumber: 'C305', name: 'Innovation Pit', capacity: 10, amenities: ['Video Conferencing', 'Whiteboard'] },
-		{ roomNumber: 'C306', name: 'Design Review', capacity: 12, amenities: ['Smart Display', 'Conference Phone'] },
-	],
-	'Wing D': [
-		{ roomNumber: 'D401', name: 'Executive Boardroom', capacity: 14, amenities: ['Video Conferencing', 'Premium Seating'] },
-		{ roomNumber: 'D402', name: 'Orion Suite', capacity: 10, amenities: ['Projector', 'Conference Phone'] },
-		{ roomNumber: 'D403', name: 'Vision Room', capacity: 8, amenities: ['Smart Display', 'Whiteboard'] },
-		{ roomNumber: 'D404', name: 'Investor Lounge', capacity: 12, amenities: ['Video Conferencing', 'Coffee Station'] },
-		{ roomNumber: 'D405', name: 'Private Cabin 1', capacity: 4, amenities: ['Monitor', 'Whiteboard'] },
-		{ roomNumber: 'D406', name: 'Private Cabin 2', capacity: 4, amenities: ['Monitor', 'Whiteboard'] },
+		{
+			roomNumber: 'C-MeetingRoom41',
+			name: 'Meeting Room 41',
+			capacity: 12,
+			amenities: ['Projector', 'Whiteboard', 'Video Conference'],
+		},
+		{ roomNumber: 'C-MeetingRoom137', name: 'Meeting Room 137', capacity: 8, amenities: ['TV Screen', 'Whiteboard'] },
 	],
 };
 
@@ -82,10 +67,6 @@ const ADMIN_EMAIL = 'admin@siemensbooking.local';
 const ADMIN_PASSWORD = 'Admin123!';
 
 const ROOM_IMAGES_BY_WING = {
-	'Wing A': [
-		'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80',
-		'https://images.unsplash.com/photo-1497366412874-3415097a27e7?auto=format&fit=crop&w=1200&q=80',
-	],
 	'Wing B': [
 		'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80',
 		'https://images.unsplash.com/photo-1497215842964-222b430dc094?auto=format&fit=crop&w=1200&q=80',
@@ -129,6 +110,13 @@ async function seed() {
 	await mongoose.connect(process.env.MONGODB_URI);
 
 	console.log('Connected to MongoDB for seeding.');
+
+	// Clear all existing data for a clean slate
+	await Booking.deleteMany({});
+	await Room.deleteMany({});
+	await Wing.deleteMany({});
+	console.log('Cleared all existing rooms, bookings, and wings.');
+
 	const summary = {
 		wingsUpserted: 0,
 		roomsUpserted: 0,

@@ -13,6 +13,7 @@ const mobileNavItems = [...navItems, { id: 'settings', label: 'Settings', icon: 
 
 export default function DashboardSidebar({ collapsed, onToggleCollapse, profile, onLogout }) {
 	const [accountOpen, setAccountOpen] = useState(false);
+	const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
 	const accountRef = useRef(null);
 
 	useEffect(() => {
@@ -25,6 +26,11 @@ export default function DashboardSidebar({ collapsed, onToggleCollapse, profile,
 		document.addEventListener('mousedown', handleClickOutside);
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, []);
+
+	const handleMobileLogout = () => {
+		setMobileAccountOpen(false);
+		onLogout?.();
+	};
 
 	const handleLogout = () => {
 		setAccountOpen(false);
@@ -186,6 +192,53 @@ export default function DashboardSidebar({ collapsed, onToggleCollapse, profile,
 						)}
 					</NavLink>
 				))}
+
+				{/* User avatar + logout */}
+				<div className='relative'>
+					<button
+						type='button'
+						onClick={() => setMobileAccountOpen(prev => !prev)}
+						className='flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-200 text-slate-400 dark:text-slate-500'
+					>
+						<img
+							src={profile?.avatarUrl}
+							alt={profile?.name}
+							className='w-7 h-7 rounded-full border-2 border-siemens-petrol/30'
+						/>
+						<span className='text-[9px] font-bold tracking-wide'>Me</span>
+					</button>
+
+					{mobileAccountOpen && (
+						<>
+							<div className='fixed inset-0 z-40' onClick={() => setMobileAccountOpen(false)} />
+							<div className='absolute bottom-full right-0 mb-2 z-50 bg-white dark:bg-[#0f151a] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl shadow-xl p-3 min-w-[180px]'>
+								<div className='flex items-center gap-2 pb-2 mb-2 border-b border-black/[0.06] dark:border-white/[0.06]'>
+									<img
+										src={profile?.avatarUrl}
+										alt={profile?.name}
+										className='w-8 h-8 rounded-full border-2 border-siemens-petrol/20 shrink-0'
+									/>
+									<div className='min-w-0'>
+										<p className='text-[13px] font-bold text-slate-900 dark:text-white truncate leading-tight'>
+											{profile?.name}
+										</p>
+										<p className='text-[9px] text-slate-400 font-bold tracking-widest uppercase'>
+											{profile?.team || 'Member'}
+										</p>
+									</div>
+								</div>
+								<button
+									type='button'
+									onClick={handleMobileLogout}
+									className='w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/10 transition-colors'
+								>
+									<LogOut className='w-3.5 h-3.5' />
+									Logout
+								</button>
+							</div>
+						</>
+					)}
+				</div>
 			</nav>
 		</>
 	);

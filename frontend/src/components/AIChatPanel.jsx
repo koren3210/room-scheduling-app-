@@ -112,7 +112,7 @@ export default function AIChatPanel({
 			</div>
 
 			{/* DESKTOP PANEL */}
-			<section className='hidden lg:flex flex-col group glass lg:rounded-[2rem] overflow-hidden lg:shadow-xl lg:h-[600px] border border-black/5 dark:border-white/5 shrink-0 bg-white/40 dark:bg-gray-900/40 min-w-0'>
+			<section className='hidden lg:flex flex-col group glass lg:rounded-[2rem] overflow-hidden lg:shadow-xl lg:h-[min(68vh,720px)] lg:min-h-[520px] border border-black/5 dark:border-white/5 shrink-0 bg-white/40 dark:bg-gray-900/40 min-w-0'>
 				<div className='p-5 flex items-center justify-between border-b border-black/5 dark:border-white/5 bg-white/60 dark:bg-gray-900/60 backdrop-blur-md shrink-0'>
 					<div className='flex items-center space-x-3'>
 						<div className='w-10 h-10 rounded-xl bg-siemens-petrol flex items-center justify-center shadow-sm'>
@@ -125,7 +125,10 @@ export default function AIChatPanel({
 					</div>
 				</div>
 
-				<div className='chat-history flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar scroll-smooth'>
+				<div
+					className='chat-history flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar scroll-smooth'
+					style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+				>
 					{messages.map(message => (
 						<div
 							key={message.id}
@@ -203,7 +206,7 @@ export default function AIChatPanel({
 			{mobileOpen &&
 				typeof document !== 'undefined' &&
 				createPortal(
-					<div className='fixed inset-0 z-[99999] flex flex-col bg-slate-50 dark:bg-[#090d12]'>
+					<div className='fixed inset-0 z-[99999] flex flex-col bg-slate-50 dark:bg-[#090d12] touch-pan-y'>
 						<div className='flex items-center justify-between px-4 py-4 border-b border-black/[0.06] dark:border-white/[0.06] bg-white/95 dark:bg-[#0d1117]/95 backdrop-blur-xl shrink-0'>
 							<div className='flex items-center gap-3'>
 								<div className='w-8 h-8 rounded-xl bg-siemens-petrol flex items-center justify-center'>
@@ -225,7 +228,10 @@ export default function AIChatPanel({
 							</button>
 						</div>
 
-						<div className='flex-1 overflow-y-auto p-4 space-y-5 scroll-smooth custom-scrollbar bg-slate-50 dark:bg-slate-950'>
+						<div
+							className='flex-1 overflow-y-auto p-4 space-y-5 scroll-smooth custom-scrollbar bg-slate-50 dark:bg-slate-950'
+							style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+						>
 							{messages.map(message => (
 								<div
 									key={`mobile-${message.id}`}

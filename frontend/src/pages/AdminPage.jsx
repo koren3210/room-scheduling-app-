@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import PageShell from '../components/PageShell.jsx';
 import AdminSection from '../components/AdminSection.jsx';
-import { createRoom, fetchRooms } from '../api/rooms';
+import { createRoom, fetchRooms, deleteRoom } from '../api/rooms';
 
 function fileToDataUrl(file) {
 	return new Promise((resolve, reject) => {
@@ -39,9 +39,14 @@ export default function AdminPage() {
 		const wing = formData.get('wing');
 		const capacity = formData.get('capacity');
 		const imageFile = formData.get('image');
-		const amenities = Array.from(event.currentTarget.querySelectorAll('input[type=checkbox]:checked')).map(
-			input => input.value,
-		);
+		let amenities;
+		try {
+			const amenitiesJson = formData.get('amenitiesJson');
+			const parsedAmenities = typeof amenitiesJson === 'string' && amenitiesJson.length > 0 ? JSON.parse(amenitiesJson) : [];
+			amenities = Array.isArray(parsedAmenities) ? parsedAmenities : [];
+		} catch {
+			amenities = [];
+		}
 
 		if (!name || !wing || !capacity) return;
 
@@ -80,14 +85,26 @@ export default function AdminPage() {
 					name: savedRoom.name,
 					wing: savedRoom.wing,
 					capacity: savedRoom.capacity,
-					amenities: savedRoom.amenities,
+					amenities: savedRoom.amenities || [],
 					images: savedRoom.images || [],
 				},
 			]);
-			event.currentTarget.reset();
+			event.currentTarget?.reset?.();
 		} catch (error) {
 			toast.error(error?.message || 'Unable to create room.');
 			console.error('Unable to create room', error);
+		}
+	};
+
+	const handleDeleteRoom = async roomId => {
+		try {
+			await deleteRoom(roomId);
+			queryClient.invalidateQueries({ queryKey: ['admin-rooms'] });
+			setAdminRooms(curr => curr.filter(r => r.id !== roomId));
+			toast.success('Room deleted successfully.');
+		} catch (error) {
+			toast.error('Failed to delete room.');
+			console.error('Error deleting room:', error);
 		}
 	};
 
@@ -96,7 +113,7 @@ export default function AdminPage() {
 			{roomsQuery.isLoading ? (
 				<p className='text-sm text-slate-500'>Loading registry...</p>
 			) : (
-				<AdminSection adminRooms={displayRooms} onAddRoom={handleAddRoom} />
+				<AdminSection adminRooms={displayRooms} onAddRoom={handleAddRoom} onDeleteRoom={handleDeleteRoom} />
 			)}
 		</PageShell>
 	);

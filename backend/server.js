@@ -129,7 +129,12 @@ app.use(
 		origin: (origin, callback) => {
 			// This allows requests with no origin (like mobile apps or curl)
 			// and checks if the origin matches your frontend exactly
-			const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+			const allowedOrigins = [
+				'http://localhost:5173',
+				'http://127.0.0.1:5173',
+				'http://localhost:5174',
+				'http://localhost:5175',
+			];
 			if (!origin || allowedOrigins.includes(origin)) {
 				callback(null, true);
 			} else {
@@ -360,12 +365,31 @@ app.post(
 	}),
 );
 
+// Delete a room
+app.delete(
+	'/api/rooms/:id',
+	verifyToken,
+	asyncHandler(async (req, res) => {
+		const { id } = req.params;
+
+		// Check if the room exists
+		const room = await Room.findById(id);
+		if (!room) {
+			return res.status(404).json({ error: 'Room not found' });
+		}
+
+		// Delete the room
+		await room.deleteOne();
+		res.status(200).json({ message: 'Room deleted successfully' });
+	}),
+);
+
 // Bookings
 app.get(
 	'/api/bookings',
 	verifyToken,
 	asyncHandler(async (req, res) => {
-		const { userId, roomId, status, mine } = req.query;
+		const { userId, roomId, status, mine, start, end } = req.query;
 		const filter = {};
 		if (String(mine) === 'true') {
 			const targetUserId = String(req.user.id);
@@ -380,7 +404,34 @@ app.get(
 			filter.$or = [{ user: targetUserId }, { attendeeUsers: targetUserId }];
 		}
 		if (roomId) filter.room = roomId;
-		if (status) filter.status = status;
+		if (status) {
+			const statuses = String(status)
+				.split(',')
+				.map(item => item.trim())
+				.filter(Boolean);
+			if (statuses.length === 1) filter.status = statuses[0];
+			if (statuses.length > 1) filter.status = { $in: statuses };
+		}
+
+		if (start || end) {
+			const startDate = start ? new Date(String(start)) : null;
+			const endDate = end ? new Date(String(end)) : null;
+			if (startDate && Number.isNaN(startDate.getTime())) {
+				return res.status(400).json({ error: 'Invalid start query date.' });
+			}
+			if (endDate && Number.isNaN(endDate.getTime())) {
+				return res.status(400).json({ error: 'Invalid end query date.' });
+			}
+
+			if (startDate && endDate) {
+				filter.startAt = { $lt: endDate };
+				filter.endAt = { $gt: startDate };
+			} else if (startDate) {
+				filter.endAt = { $gt: startDate };
+			} else if (endDate) {
+				filter.startAt = { $lt: endDate };
+			}
+		}
 
 		const bookings = await Booking.find(filter)
 			.populate('user', 'name email avatarUrl')
