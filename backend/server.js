@@ -572,6 +572,19 @@ app.put(
 	}),
 );
 
+// If users open frontend routes on the backend domain, redirect them to the frontend app.
+app.get('*', (req, res, next) => {
+	if (req.path.startsWith('/api')) return next();
+
+	const frontendUrl = process.env.FRONTEND_URL;
+	if (frontendUrl && process.env.NODE_ENV === 'production') {
+		const target = `${frontendUrl.replace(/\/$/, '')}${req.originalUrl}`;
+		return res.redirect(302, target);
+	}
+
+	return res.status(404).json({ error: 'Route not found.' });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
 	console.error(err);

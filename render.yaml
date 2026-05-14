@@ -9,6 +9,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: FRONTEND_URL
+        value: https://room-scheduling-app-1.onrender.com
       - key: MONGODB_URI
         sync: false
       - key: GOOGLE_AI_API_KEY
