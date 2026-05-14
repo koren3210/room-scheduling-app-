@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, Send, X } from 'lucide-react';
 
@@ -84,6 +84,37 @@ export default function AIChatPanel({
 	userAvatarUrl,
 }) {
 	const [input, setInput] = useState('');
+
+	useEffect(() => {
+		if (!mobileOpen || typeof document === 'undefined') return undefined;
+
+		const html = document.documentElement;
+		const body = document.body;
+		const previousHtmlOverflow = html.style.overflow;
+		const previousBodyOverflow = body.style.overflow;
+
+		html.style.overflow = 'hidden';
+		body.style.overflow = 'hidden';
+
+		const setViewportHeight = () => {
+			const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+			html.style.setProperty('--mobile-chat-height', `${Math.round(viewportHeight)}px`);
+		};
+
+		setViewportHeight();
+		window.visualViewport?.addEventListener('resize', setViewportHeight);
+		window.visualViewport?.addEventListener('scroll', setViewportHeight);
+		window.addEventListener('orientationchange', setViewportHeight);
+
+		return () => {
+			html.style.overflow = previousHtmlOverflow;
+			body.style.overflow = previousBodyOverflow;
+			html.style.removeProperty('--mobile-chat-height');
+			window.visualViewport?.removeEventListener('resize', setViewportHeight);
+			window.visualViewport?.removeEventListener('scroll', setViewportHeight);
+			window.removeEventListener('orientationchange', setViewportHeight);
+		};
+	}, [mobileOpen]);
 
 	const handleSubmit = event => {
 		event.preventDefault();
@@ -207,7 +238,10 @@ export default function AIChatPanel({
 			{mobileOpen &&
 				typeof document !== 'undefined' &&
 				createPortal(
-					<div className='fixed inset-0 z-[99999] flex flex-col bg-slate-50 dark:bg-[#090d12] touch-pan-y'>
+					<div
+						className='fixed inset-x-0 top-0 z-[99999] flex flex-col bg-slate-50 dark:bg-[#090d12] touch-pan-y overscroll-none'
+						style={{ height: 'var(--mobile-chat-height, 100dvh)' }}
+					>
 						<div className='flex items-center justify-between px-4 py-4 border-b border-black/[0.06] dark:border-white/[0.06] bg-white/95 dark:bg-[#0d1117]/95 backdrop-blur-xl shrink-0'>
 							<div className='flex items-center gap-3'>
 								<div className='w-8 h-8 rounded-xl bg-siemens-petrol flex items-center justify-center'>
@@ -271,7 +305,10 @@ export default function AIChatPanel({
 							)}
 						</div>
 
-						<div className='p-3 border-t border-black/5 dark:border-white/5 bg-white/90 dark:bg-[#0B1114]/90 backdrop-blur-xl'>
+						<div
+							className='p-3 border-t border-black/5 dark:border-white/5 bg-white/90 dark:bg-[#0B1114]/90 backdrop-blur-xl shrink-0'
+							style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}
+						>
 							<form onSubmit={handleSubmit} className='relative'>
 								<input
 									value={input}

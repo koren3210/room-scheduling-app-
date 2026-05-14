@@ -573,7 +573,7 @@ app.put(
 );
 
 // If users open frontend routes on the backend domain, redirect them to the frontend app.
-app.get('*', (req, res, next) => {
+app.use((req, res, next) => {
 	if (req.path.startsWith('/api')) return next();
 
 	const frontendUrl = process.env.FRONTEND_URL;
