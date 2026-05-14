@@ -1,0 +1,28 @@
+services:
+  # Backend API Service
+  - type: web
+    name: room-scheduling-backend
+    runtime: node
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: GOOGLE_AI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: PORT
+        value: 10000
+
+  # Frontend Static Site
+  - type: static
+    name: room-scheduling-frontend
+    staticPublishPath: frontend/dist
+    buildCommand: cd frontend && npm install && npm run build
+    envVars:
+      - key: VITE_API_URL
+        value: https://room-scheduling-backend.onrender.com
