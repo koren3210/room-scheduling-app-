@@ -90,29 +90,27 @@ export default function AIChatPanel({
 
 		const html = document.documentElement;
 		const body = document.body;
-		const previousHtmlOverflow = html.style.overflow;
-		const previousBodyOverflow = body.style.overflow;
+		const htmlOverflow = html.style.overflow;
+		const bodyOverflow = body.style.overflow;
+		const bodyPosition = body.style.position;
+		const bodyHeight = body.style.height;
+		const bodyWidth = body.style.width;
 
+		// Lock all scrolling completely when modal is open
 		html.style.overflow = 'hidden';
+		html.style.height = '100%';
 		body.style.overflow = 'hidden';
-
-		const setViewportHeight = () => {
-			const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-			html.style.setProperty('--mobile-chat-height', `${Math.round(viewportHeight)}px`);
-		};
-
-		setViewportHeight();
-		window.visualViewport?.addEventListener('resize', setViewportHeight);
-		window.visualViewport?.addEventListener('scroll', setViewportHeight);
-		window.addEventListener('orientationchange', setViewportHeight);
+		body.style.height = '100%';
+		body.style.position = 'fixed';
+		body.style.width = '100%';
 
 		return () => {
-			html.style.overflow = previousHtmlOverflow;
-			body.style.overflow = previousBodyOverflow;
-			html.style.removeProperty('--mobile-chat-height');
-			window.visualViewport?.removeEventListener('resize', setViewportHeight);
-			window.visualViewport?.removeEventListener('scroll', setViewportHeight);
-			window.removeEventListener('orientationchange', setViewportHeight);
+			html.style.overflow = htmlOverflow;
+			html.style.height = '';
+			body.style.overflow = bodyOverflow;
+			body.style.height = bodyHeight;
+			body.style.position = bodyPosition;
+			body.style.width = bodyWidth;
 		};
 	}, [mobileOpen]);
 
@@ -239,8 +237,8 @@ export default function AIChatPanel({
 				typeof document !== 'undefined' &&
 				createPortal(
 					<div
-						className='fixed inset-x-0 top-0 z-[99999] flex flex-col bg-slate-50 dark:bg-[#090d12] touch-pan-y overscroll-none'
-						style={{ height: 'var(--mobile-chat-height, 100dvh)' }}
+						className='fixed inset-0 z-[99999] flex flex-col bg-slate-50 dark:bg-[#090d12]'
+						style={{ height: '100dvh', overflow: 'hidden', WebkitOverflowScrolling: 'touch' }}
 					>
 						<div className='flex items-center justify-between px-4 py-4 border-b border-black/[0.06] dark:border-white/[0.06] bg-white/95 dark:bg-[#0d1117]/95 backdrop-blur-xl shrink-0'>
 							<div className='flex items-center gap-3'>
