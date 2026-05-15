@@ -2,13 +2,15 @@ import { CheckCircle, Clock } from 'lucide-react';
 
 export default function FacilitySection({ rooms }) {
 	const availableCount = rooms.filter(r => r.status === 'available').length;
+	const totalRooms = rooms.length;
+	const occupancyPercent = totalRooms ? Math.round(((totalRooms - availableCount) / totalRooms) * 100) : 0;
 
 	return (
 		<div>
 			{/* Stats row */}
 			<div className='grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
 				{[
-					{ label: 'Occupancy', value: '72%', accent: false },
+					{ label: 'Occupancy', value: `${occupancyPercent}%`, accent: false },
 					{ label: 'Available', value: availableCount, accent: false },
 					{ label: 'Active Wings', value: 'B, C, D', accent: false },
 					{ label: 'Energy Save', value: '12kW', accent: true },

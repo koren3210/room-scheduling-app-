@@ -3,15 +3,19 @@ const mapByWing = {
 	'Wing C': 'https://app.mappedin.com/map/6a042233b2b6a0000b7171bf?embedded=true',
 	'Wing D': 'https://app.mappedin.com/map/6a041920520aaf000b2a31e4?embedded=true',
 };
-export default function FacilityMapRadar({ activeWing = 'Wing D', onWingChange }) {
+export default function FacilityMapRadar({ rooms = [], activeWing = 'Wing D', onWingChange }) {
 	const activeMap = mapByWing[activeWing];
+	const availableNow = rooms.filter(room => room.status === 'available').length;
+	const occupiedNow = rooms.length - availableNow;
 
 	return (
 		<div className='mb-8 rounded-2xl border border-black/[0.06] dark:border-white/[0.06] bg-white/80 dark:bg-white/[0.03] shadow-sm p-4 lg:p-6'>
 			<div className='flex items-center justify-between gap-3 mb-4 flex-wrap'>
 				<div>
 					<h3 className='text-base font-bold text-slate-900 dark:text-white'>Wing Map Radar</h3>
-					<p className='text-xs text-slate-500'>Map view only.</p>
+					<p className='text-xs text-slate-500'>
+						Live now: {availableNow} available, {occupiedNow} occupied.
+					</p>
 				</div>
 				<div className='flex items-center gap-2'>
 					{['Wing D', 'Wing C', 'Wing B'].map(wing => (

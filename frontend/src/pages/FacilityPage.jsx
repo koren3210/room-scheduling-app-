@@ -1,13 +1,17 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PageShell from '../components/PageShell.jsx';
 import FacilitySection from '../components/FacilitySection.jsx';
 import FacilityMapRadar from '../components/FacilityMapRadar.jsx';
 import { fetchRooms } from '../api/rooms';
+import { subscribeToBookingNotifications } from '../api/bookings';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function FacilityPage() {
 	const [wingFilter, setWingFilter] = useState('Wing D');
 	const [sortBy, setSortBy] = useState('wing');
+	const queryClient = useQueryClient();
+	const { isAuthenticated, user } = useAuth();
 
 	const roomsQuery = useQuery({
 		queryKey: ['facility-rooms', wingFilter, sortBy],
@@ -17,7 +21,25 @@ export default function FacilityPage() {
 				sortBy: sortBy === 'date' ? 'nextBookingDate' : 'wing',
 				sortOrder: 'asc',
 			}),
+		refetchInterval: 45000,
+		refetchOnWindowFocus: true,
 	});
+
+	useEffect(() => {
+		if (!isAuthenticated || !user?.id) return undefined;
+
+		const token = localStorage.getItem('token');
+		if (!token) return undefined;
+
+		const source = subscribeToBookingNotifications(token, event => {
+			if (!event?.eventType || event.eventType === 'connected') return;
+			queryClient.invalidateQueries({ queryKey: ['facility-rooms'] });
+		});
+
+		return () => {
+			source.close();
+		};
+	}, [isAuthenticated, queryClient, user?.id]);
 
 	const rooms = (roomsQuery.data || []).map(room => ({
 		id: room._id || room.id,
@@ -25,8 +47,15 @@ export default function FacilityPage() {
 		roomNumber: room.roomNumber || '',
 		wing: room.wing,
 		capacity: room.capacity,
-		status: room.isAvailable ? 'available' : 'occupied',
-		until: room.nextBookingAt ? new Date(room.nextBookingAt).toLocaleString() : '',
+		status: room.isAvailableNow === false ? 'occupied' : 'available',
+		until:
+			room.isAvailableNow === false
+				? room.occupiedUntil
+					? new Date(room.occupiedUntil).toLocaleString()
+					: ''
+				: room.nextBookingAt
+					? new Date(room.nextBookingAt).toLocaleString()
+					: '',
 	}));
 
 	return (
